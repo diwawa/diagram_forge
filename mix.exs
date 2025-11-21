@@ -72,6 +72,7 @@ defmodule DiagramForge.MixProject do
       {:bandit, "~> 1.5"},
       {:oban, "~> 2.18"},
       {:mox, "~> 1.0", only: :test},
+      {:bypass, "~> 2.1", only: :test},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false}
     ]

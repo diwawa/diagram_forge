@@ -26,6 +26,7 @@ defmodule DiagramForge.AI.Client do
     * `:max_attempts` - Maximum retry attempts (default: 3)
     * `:base_delay_ms` - Base retry delay in ms (default: 1000)
     * `:max_delay_ms` - Maximum retry delay in ms (default: 10000)
+    * `:base_url` - Override the base URL (for testing, default: https://api.openai.com/v1)
 
   ## Examples
 
@@ -45,6 +46,7 @@ defmodule DiagramForge.AI.Client do
   def chat!(messages, opts \\ []) do
     api_key = @cfg[:api_key] || raise "Missing OPENAI_API_KEY"
     model = opts[:model] || @cfg[:model]
+    base_url = opts[:base_url] || "https://api.openai.com/v1"
 
     retry_opts = [
       max_attempts: opts[:max_attempts] || 3,
@@ -57,7 +59,10 @@ defmodule DiagramForge.AI.Client do
       }
     ]
 
-    case Retry.with_retry(fn -> make_request(api_key, model, messages) end, retry_opts) do
+    case Retry.with_retry(
+           fn -> make_request(api_key, model, messages, base_url) end,
+           retry_opts
+         ) do
       {:ok, content} ->
         content
 
@@ -73,14 +78,16 @@ defmodule DiagramForge.AI.Client do
 
   # Private functions
 
-  defp make_request(api_key, model, messages) do
+  defp make_request(api_key, model, messages, base_url) do
     body = %{
       "model" => model,
       "messages" => messages,
       "response_format" => %{"type" => "json_object"}
     }
 
-    case Req.post("https://api.openai.com/v1/chat/completions",
+    url = "#{base_url}/chat/completions"
+
+    case Req.post(url,
            json: body,
            headers: [
              {"authorization", "Bearer #{api_key}"},

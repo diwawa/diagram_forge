@@ -43,3 +43,8 @@ config :phoenix_live_view,
 
 # Use MockAIClient in tests
 config :diagram_forge, :ai_client, DiagramForge.MockAIClient
+
+# Configure AI client for testing
+config :diagram_forge, DiagramForge.AI,
+  api_key: "test_api_key",
+  model: "gpt-4"

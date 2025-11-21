@@ -12,6 +12,27 @@ defmodule DiagramForge.ErrorHandling.Retry do
   - Only retries errors identified as retryable by ErrorCategorizer
   - Logs each retry attempt with context
   - Supports custom retry predicates
+  - Emits telemetry events for monitoring
+
+  ## Telemetry Events
+
+  This module emits the following telemetry events for monitoring retry behavior:
+
+  - `[:diagram_forge, :retry, :start]` - When retry logic begins
+    - Measurements: `%{system_time: System.system_time()}`
+    - Metadata: `%{max_attempts: integer(), context: map()}`
+
+  - `[:diagram_forge, :retry, :attempt]` - On each retry attempt
+    - Measurements: `%{attempt: integer(), delay_ms: integer()}`
+    - Metadata: `%{error: term(), category: atom(), severity: atom(), context: map()}`
+
+  - `[:diagram_forge, :retry, :success]` - When operation succeeds
+    - Measurements: `%{attempts_used: integer(), duration: integer()}`
+    - Metadata: `%{context: map()}`
+
+  - `[:diagram_forge, :retry, :failure]` - When all retries are exhausted
+    - Measurements: `%{attempts_used: integer(), duration: integer()}`
+    - Metadata: `%{error: term(), context: map()}`
 
   ## Examples
 
@@ -70,7 +91,26 @@ defmodule DiagramForge.ErrorHandling.Retry do
     on_retry = Keyword.get(opts, :on_retry)
     context = Keyword.get(opts, :context, %{})
 
-    do_retry(func, 1, max_attempts, base_delay_ms, max_delay_ms, retry_if, on_retry, context)
+    # Emit telemetry start event
+    start_time = System.monotonic_time()
+
+    :telemetry.execute(
+      [:diagram_forge, :retry, :start],
+      %{system_time: System.system_time()},
+      %{max_attempts: max_attempts, context: context}
+    )
+
+    retry_config = %{
+      max_attempts: max_attempts,
+      base_delay_ms: base_delay_ms,
+      max_delay_ms: max_delay_ms,
+      retry_if: retry_if,
+      on_retry: on_retry,
+      context: context,
+      start_time: start_time
+    }
+
+    do_retry(func, 1, retry_config)
   end
 
   @doc """
@@ -99,42 +139,43 @@ defmodule DiagramForge.ErrorHandling.Retry do
 
   # Private implementation
 
-  defp do_retry(func, attempt, max_attempts, base_delay, max_delay, retry_if, on_retry, context)
-       when attempt <= max_attempts do
-    retry_config = %{
-      func: func,
-      attempt: attempt,
-      max_attempts: max_attempts,
-      base_delay: base_delay,
-      max_delay: max_delay,
-      retry_if: retry_if,
-      on_retry: on_retry,
-      context: context
-    }
+  defp do_retry(func, attempt, config) when attempt <= config.max_attempts do
+    %{context: context, start_time: start_time} = config
 
     case func.() do
       {:ok, _result} = success ->
+        # Emit success telemetry
+        duration = System.monotonic_time() - start_time
+
+        :telemetry.execute(
+          [:diagram_forge, :retry, :success],
+          %{attempts_used: attempt, duration: duration},
+          %{context: context}
+        )
+
         success
 
       {:error, _reason} = error ->
-        handle_error(error, retry_config)
+        handle_error(func, error, attempt, config)
 
       other ->
         # If function doesn't return {:ok, _} or {:error, _}, return as-is
+        # Still emit success telemetry
+        duration = System.monotonic_time() - start_time
+
+        :telemetry.execute(
+          [:diagram_forge, :retry, :success],
+          %{attempts_used: attempt, duration: duration},
+          %{context: context}
+        )
+
         other
     end
   end
 
-  defp do_retry(
-         _func,
-         attempt,
-         max_attempts,
-         _base_delay,
-         _max_delay,
-         _retry_if,
-         _on_retry,
-         context
-       ) do
+  defp do_retry(_func, attempt, config) do
+    %{max_attempts: max_attempts, context: context} = config
+
     Logger.error("Maximum retry attempts (#{max_attempts}) exceeded",
       attempt: attempt,
       context: context
@@ -143,23 +184,29 @@ defmodule DiagramForge.ErrorHandling.Retry do
     {:error, :max_retries_exceeded}
   end
 
-  defp handle_error(error, retry_config) do
+  defp handle_error(func, error, attempt, config) do
     %{
-      func: func,
-      attempt: attempt,
       max_attempts: max_attempts,
-      base_delay: base_delay,
-      max_delay: max_delay,
+      base_delay_ms: base_delay,
+      max_delay_ms: max_delay,
       retry_if: retry_if,
       on_retry: on_retry,
-      context: context
-    } = retry_config
+      context: context,
+      start_time: start_time
+    } = config
 
     should_retry = retry_if.(error)
 
     if should_retry and attempt < max_attempts do
       {category, severity} = ErrorCategorizer.categorize_error(error)
       delay = calculate_delay(attempt, base_delay, max_delay)
+
+      # Emit telemetry for retry attempt
+      :telemetry.execute(
+        [:diagram_forge, :retry, :attempt],
+        %{attempt: attempt, delay_ms: delay},
+        %{error: error, category: category, severity: severity, context: context}
+      )
 
       Logger.warning("Retry attempt #{attempt}/#{max_attempts} after #{delay}ms",
         error: inspect(error),
@@ -178,22 +225,22 @@ defmodule DiagramForge.ErrorHandling.Retry do
       Process.sleep(delay)
 
       # Retry
-      do_retry(
-        func,
-        attempt + 1,
-        max_attempts,
-        base_delay,
-        max_delay,
-        retry_if,
-        on_retry,
-        context
-      )
+      do_retry(func, attempt + 1, config)
     else
       # Error is not retryable or max attempts reached
+      duration = System.monotonic_time() - start_time
+
       if should_retry do
         Logger.error("Maximum retry attempts (#{max_attempts}) exceeded",
           error: inspect(error),
           context: context
+        )
+
+        # Emit failure telemetry
+        :telemetry.execute(
+          [:diagram_forge, :retry, :failure],
+          %{attempts_used: attempt, duration: duration},
+          %{error: error, context: context}
         )
       else
         {category, severity} = ErrorCategorizer.categorize_error(error)
@@ -203,6 +250,13 @@ defmodule DiagramForge.ErrorHandling.Retry do
           category: category,
           severity: severity,
           context: context
+        )
+
+        # Emit failure telemetry
+        :telemetry.execute(
+          [:diagram_forge, :retry, :failure],
+          %{attempts_used: attempt, duration: duration},
+          %{error: error, context: context}
         )
       end
 
