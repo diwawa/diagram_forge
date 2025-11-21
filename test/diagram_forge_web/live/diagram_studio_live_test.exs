@@ -48,7 +48,12 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
 
       # Verify concepts are loaded
       assert html =~ concept.name
-      assert html =~ concept.short_description
+
+      # Expand the concept to see diagrams
+      view
+      |> expand_concept(concept.id)
+
+      html = render(view)
 
       # Verify diagrams are loaded
       assert html =~ diagram.title
@@ -68,6 +73,7 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
       |> render_click()
 
       view
+      |> expand_concept(concept1.id)
       |> element("input[phx-value-id='#{concept1.id}']")
       |> render_click()
 
@@ -101,6 +107,7 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
 
       # Toggle concept on
       view
+      |> expand_concept(concept.id)
       |> element("input[phx-value-id='#{concept.id}']")
       |> render_click()
 
@@ -125,6 +132,7 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
 
       # Toggle on
       view
+      |> expand_concept(concept.id)
       |> element("input[phx-value-id='#{concept.id}']")
       |> render_click()
 
@@ -155,10 +163,12 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
 
       # Select both concepts
       view
+      |> expand_concept(concept1.id)
       |> element("input[phx-value-id='#{concept1.id}']")
       |> render_click()
 
       view
+      |> expand_concept(concept2.id)
       |> element("input[phx-value-id='#{concept2.id}']")
       |> render_click()
 
@@ -181,10 +191,12 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
 
       # Select both concepts
       view
+      |> expand_concept(concept1.id)
       |> element("input[phx-value-id='#{concept1.id}']")
       |> render_click()
 
       view
+      |> expand_concept(concept2.id)
       |> element("input[phx-value-id='#{concept2.id}']")
       |> render_click()
 
@@ -230,6 +242,7 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
       |> render_click()
 
       view
+      |> expand_concept(concept.id)
       |> element("[phx-click='select_diagram'][phx-value-id='#{diagram.id}']")
       |> render_click()
 
@@ -398,6 +411,10 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
 
       :timer.sleep(50)
 
+      # Expand the concept to see the diagram
+      view
+      |> expand_concept(concept.id)
+
       # Verify diagram appears in the list
       assert render(view) =~ diagram.title
     end
@@ -433,8 +450,7 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
 
       # Verify upload area exists
       assert has_element?(view, "#upload-form")
-      assert render(view) =~ "Click to upload or drag and drop"
-      assert render(view) =~ "PDF or Markdown"
+      assert render(view) =~ "Click or drag PDF/MD"
 
       # Verify upload button is disabled when no file is selected
       assert view
@@ -457,10 +473,12 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
 
       # Select both concepts
       view
+      |> expand_concept(concept1.id)
       |> element("input[phx-value-id='#{concept1.id}']")
       |> render_click()
 
       view
+      |> expand_concept(concept2.id)
       |> element("input[phx-value-id='#{concept2.id}']")
       |> render_click()
 
@@ -472,7 +490,7 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
       html = render(view)
 
       # Verify progress bar appears
-      assert html =~ "Generating diagrams: 0 of 2"
+      assert html =~ "Generating: 0 of 2"
     end
 
     test "updates progress when generation completes", %{conn: conn} do
@@ -486,6 +504,7 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
       |> render_click()
 
       view
+      |> expand_concept(concept.id)
       |> element("input[phx-value-id='#{concept.id}']")
       |> render_click()
 
@@ -494,7 +513,7 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
       |> render_click()
 
       # Verify progress bar appears initially
-      assert render(view) =~ "Generating diagrams: 0 of 1"
+      assert render(view) =~ "Generating: 0 of 1"
 
       # Create a diagram and simulate completion event
       diagram = fixture(:diagram, document_id: document.id, concept_id: concept.id)
@@ -509,7 +528,7 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
       html = render(view)
 
       # Verify progress bar disappears after all generations complete
-      refute html =~ "Generating diagrams:"
+      refute html =~ "Generating:"
 
       # Verify diagram appears in list
       assert html =~ diagram.title
@@ -545,6 +564,7 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
       |> render_click()
 
       view
+      |> expand_concept(concept.id)
       |> element("input[phx-value-id='#{concept.id}']")
       |> render_click()
 
@@ -563,11 +583,11 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
       html = render(view)
 
       # Verify error severity badge appears
-      assert html =~ "MEDIUM"
+      assert html =~ "⚠"
       assert html =~ "⚠"
 
       # Verify concept is no longer in generating_concepts
-      refute html =~ "Generating diagrams:"
+      refute html =~ "Generating:"
     end
 
     test "resets progress tracking when switching documents", %{conn: conn} do
@@ -584,6 +604,7 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
       |> render_click()
 
       view
+      |> expand_concept(concept1.id)
       |> element("input[phx-value-id='#{concept1.id}']")
       |> render_click()
 
@@ -592,7 +613,7 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
       |> render_click()
 
       # Verify progress bar appears
-      assert render(view) =~ "Generating diagrams: 0 of 1"
+      assert render(view) =~ "Generating: 0 of 1"
 
       # Switch to second document
       view
@@ -600,7 +621,7 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
       |> render_click()
 
       # Verify progress was reset
-      refute render(view) =~ "Generating diagrams:"
+      refute render(view) =~ "Generating:"
     end
   end
 
@@ -616,6 +637,7 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
       |> render_click()
 
       view
+      |> expand_concept(concept.id)
       |> element("input[phx-value-id='#{concept.id}']")
       |> render_click()
 
@@ -634,7 +656,7 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
       html = render(view)
 
       # Verify critical badge with red styling
-      assert html =~ "CRITICAL"
+      assert html =~ "⚠"
       assert html =~ "bg-red-900/50"
     end
 
@@ -649,6 +671,7 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
       |> render_click()
 
       view
+      |> expand_concept(concept.id)
       |> element("input[phx-value-id='#{concept.id}']")
       |> render_click()
 
@@ -667,7 +690,7 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
       html = render(view)
 
       # Verify high severity badge with orange styling
-      assert html =~ "HIGH"
+      assert html =~ "⚠"
       assert html =~ "bg-orange-900/50"
     end
 
@@ -682,6 +705,7 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
       |> render_click()
 
       view
+      |> expand_concept(concept.id)
       |> element("input[phx-value-id='#{concept.id}']")
       |> render_click()
 
@@ -700,7 +724,7 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
       html = render(view)
 
       # Verify medium severity badge with yellow styling
-      assert html =~ "MEDIUM"
+      assert html =~ "⚠"
       assert html =~ "bg-yellow-900/50"
     end
 
@@ -715,6 +739,7 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
       |> render_click()
 
       view
+      |> expand_concept(concept.id)
       |> element("input[phx-value-id='#{concept.id}']")
       |> render_click()
 
@@ -733,7 +758,7 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
       html = render(view)
 
       # Verify low severity badge with blue styling
-      assert html =~ "LOW"
+      assert html =~ "⚠"
       assert html =~ "bg-blue-900/50"
     end
 
@@ -748,6 +773,7 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
       |> render_click()
 
       view
+      |> expand_concept(concept.id)
       |> element("input[phx-value-id='#{concept.id}']")
       |> render_click()
 
@@ -764,9 +790,9 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
       :timer.sleep(50)
 
       # Verify error badge appears
-      assert render(view) =~ "MEDIUM"
+      assert render(view) =~ "⚠"
 
-      # Regenerate
+      # Regenerate (concept is still expanded from earlier)
       view
       |> element("input[phx-value-id='#{concept.id}']")
       |> render_click()
@@ -776,7 +802,16 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
       |> render_click()
 
       # Verify error badge was cleared
-      refute render(view) =~ "MEDIUM"
+      refute render(view) =~ "⚠"
     end
+  end
+
+  # Helper function to expand a concept before interacting with its content
+  defp expand_concept(view, concept_id) do
+    view
+    |> element("[phx-click='toggle_concept_expand'][phx-value-id='#{concept_id}']")
+    |> render_click()
+
+    view
   end
 end

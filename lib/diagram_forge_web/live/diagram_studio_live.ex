@@ -2,10 +2,9 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
   @moduledoc """
   Main LiveView for the Diagram Studio.
 
-  Three-column layout:
-  - Left: Document upload and listing
-  - Middle: Concepts from selected document
-  - Right: Diagrams and free-form generation
+  Two-column layout:
+  - Left sidebar: Collapsible concepts tree with diagrams, upload, and documents
+  - Right main area: Large diagram display and generate from prompt
   """
 
   use DiagramForgeWeb, :live_view
@@ -26,6 +25,7 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
      |> assign(:selected_document, nil)
      |> assign(:concepts, [])
      |> assign(:selected_concepts, MapSet.new())
+     |> assign(:expanded_concepts, MapSet.new())
      |> assign(:diagrams, [])
      |> assign(:selected_diagram, nil)
      |> assign(:prompt, "")
@@ -79,6 +79,21 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
       end
 
     {:noreply, assign(socket, :selected_concepts, selected)}
+  end
+
+  @impl true
+  def handle_event("toggle_concept_expand", %{"id" => id}, socket) do
+    concept_id = String.to_integer(id)
+    expanded = socket.assigns.expanded_concepts
+
+    expanded =
+      if MapSet.member?(expanded, concept_id) do
+        MapSet.delete(expanded, concept_id)
+      else
+        MapSet.put(expanded, concept_id)
+      end
+
+    {:noreply, assign(socket, :expanded_concepts, expanded)}
   end
 
   @impl true
@@ -254,94 +269,15 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="min-h-screen bg-slate-950 text-slate-100">
-      <div class="container mx-auto px-4 py-8">
+    <div class="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
+      <div class="container mx-auto px-4 py-8 flex-1 flex flex-col">
         <h1 class="text-4xl font-bold mb-8 text-center">DiagramForge Studio</h1>
 
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <%!-- Left Column: Documents --%>
-          <div class="space-y-4">
-            <div class="bg-slate-900 rounded-xl p-4">
-              <h2 class="text-xl font-semibold mb-4">Upload Document</h2>
-
-              <form phx-change="validate" phx-submit="save" id="upload-form">
-                <div class="space-y-4">
-                  <div
-                    class="border-2 border-dashed border-slate-700 rounded-lg p-6 text-center cursor-pointer hover:border-slate-600 transition"
-                    phx-drop-target={@uploads.document.ref}
-                  >
-                    <.live_file_input upload={@uploads.document} class="hidden" />
-                    <label for={@uploads.document.ref} class="cursor-pointer">
-                      <div class="text-slate-400">
-                        <p class="text-sm">Click to upload or drag and drop</p>
-                        <p class="text-xs mt-1">PDF or Markdown (max 50MB)</p>
-                      </div>
-                    </label>
-                  </div>
-
-                  <%= for entry <- @uploads.document.entries do %>
-                    <div class="text-sm text-slate-300">
-                      {entry.client_name} ({div(entry.client_size, 1024)} KB)
-                    </div>
-                  <% end %>
-
-                  <button
-                    type="submit"
-                    class="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition"
-                    disabled={@uploads.document.entries == []}
-                  >
-                    Upload
-                  </button>
-                </div>
-              </form>
-            </div>
-
-            <div class="bg-slate-900 rounded-xl p-4">
-              <h2 class="text-xl font-semibold mb-4">Documents</h2>
-
-              <div class="space-y-2">
-                <%= for doc <- @documents do %>
-                  <div
-                    class={[
-                      "p-3 rounded-lg cursor-pointer transition",
-                      @selected_document && @selected_document.id == doc.id &&
-                        "bg-slate-800 border border-slate-600",
-                      (!@selected_document || @selected_document.id != doc.id) &&
-                        "bg-slate-800/50 hover:bg-slate-800"
-                    ]}
-                    phx-click="select_document"
-                    phx-value-id={doc.id}
-                  >
-                    <div class="flex items-center justify-between mb-1">
-                      <span class="text-sm font-medium truncate">{doc.title}</span>
-                      <span class={[
-                        "text-xs px-2 py-1 rounded font-medium",
-                        doc.status == :ready && "bg-green-900/50 text-green-300",
-                        doc.status == :processing && "bg-yellow-900/50 text-yellow-300 animate-pulse",
-                        doc.status == :uploaded && "bg-blue-900/50 text-blue-300",
-                        doc.status == :error && "bg-red-900/50 text-red-300"
-                      ]}>
-                        {format_status(doc.status)}
-                      </span>
-                    </div>
-                    <%= if doc.status == :error and doc.error_message do %>
-                      <div class="text-xs text-red-400 mt-2">
-                        Error: {doc.error_message}
-                      </div>
-                    <% end %>
-                  </div>
-                <% end %>
-
-                <%= if @documents == [] do %>
-                  <p class="text-sm text-slate-400 text-center py-4">No documents yet</p>
-                <% end %>
-              </div>
-            </div>
-          </div>
-
-          <%!-- Middle Column: Concepts --%>
-          <div class="space-y-4">
-            <div class="bg-slate-900 rounded-xl p-4">
+        <div class="grid grid-cols-1 lg:grid-cols-4 gap-6 flex-1">
+          <%!-- Left Sidebar --%>
+          <div class="lg:col-span-1 space-y-4 flex flex-col">
+            <%!-- Concepts Section (Top) --%>
+            <div class="bg-slate-900 rounded-xl p-4 flex-1 overflow-y-auto">
               <div class="flex items-center justify-between mb-4">
                 <h2 class="text-xl font-semibold">Concepts</h2>
                 <%= if MapSet.size(@selected_concepts) > 0 do %>
@@ -358,9 +294,9 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
                 <div class="mb-4 p-3 bg-blue-900/30 border border-blue-700/50 rounded-lg">
                   <div class="flex items-center justify-between text-sm">
                     <span class="text-blue-300">
-                      Generating diagrams: {@generation_completed} of {@generation_total}
+                      Generating: {@generation_completed} of {@generation_total}
                     </span>
-                    <div class="w-32 h-2 bg-slate-700 rounded-full overflow-hidden">
+                    <div class="w-24 h-2 bg-slate-700 rounded-full overflow-hidden">
                       <div
                         class="h-full bg-blue-500 transition-all duration-300"
                         style={"width: #{if @generation_total > 0, do: (@generation_completed / @generation_total * 100), else: 0}%"}
@@ -371,45 +307,86 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
                 </div>
               <% end %>
 
-              <div class="space-y-2">
+              <div class="space-y-1">
                 <%= if @selected_document do %>
                   <%= for concept <- @concepts do %>
-                    <div class="p-3 bg-slate-800/50 rounded-lg">
-                      <label class="flex items-start gap-3 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          class="mt-1"
-                          checked={MapSet.member?(@selected_concepts, concept.id)}
-                          phx-click="toggle_concept"
-                          phx-value-id={concept.id}
-                        />
+                    <% concept_diagrams = diagrams_for_concept(@diagrams, concept.id) %>
+                    <% is_expanded = MapSet.member?(@expanded_concepts, concept.id) %>
+
+                    <div class="border border-slate-800 rounded-lg overflow-hidden">
+                      <%!-- Concept Header --%>
+                      <div
+                        class="p-2 bg-slate-800/50 hover:bg-slate-800 cursor-pointer flex items-center gap-2"
+                        phx-click="toggle_concept_expand"
+                        phx-value-id={concept.id}
+                      >
+                        <span class="text-slate-400">
+                          {if is_expanded, do: "▼", else: "▶"}
+                        </span>
                         <div class="flex-1">
-                          <div class="font-medium">{concept.name}</div>
-                          <div class="text-sm text-slate-400 mt-1">
-                            {concept.short_description}
-                          </div>
-                          <div class="flex gap-2 mt-2">
-                            <span class="text-xs px-2 py-1 bg-slate-700 rounded">
+                          <div class="font-medium text-sm">{concept.name}</div>
+                          <div class="flex gap-1 mt-1">
+                            <span class="text-xs px-1.5 py-0.5 bg-slate-700 rounded">
                               {concept.category}
                             </span>
-                            <span class="text-xs px-2 py-1 bg-slate-700 rounded">
+                            <span class="text-xs px-1.5 py-0.5 bg-slate-700 rounded">
                               {concept.level}
                             </span>
+                            <%= if length(concept_diagrams) > 0 do %>
+                              <span class="text-xs px-1.5 py-0.5 bg-blue-900/50 text-blue-300 rounded">
+                                {length(concept_diagrams)} diagrams
+                              </span>
+                            <% end %>
                             <%= if Map.has_key?(@failed_generations, concept.id) do %>
                               <% error = @failed_generations[concept.id] %>
                               <span class={[
-                                "text-xs px-2 py-1 rounded font-semibold",
+                                "text-xs px-1.5 py-0.5 rounded font-semibold",
                                 error.severity == :critical && "bg-red-900/50 text-red-300",
                                 error.severity == :high && "bg-orange-900/50 text-orange-300",
                                 error.severity == :medium && "bg-yellow-900/50 text-yellow-300",
                                 error.severity == :low && "bg-blue-900/50 text-blue-300"
                               ]}>
-                                ⚠ {String.upcase(to_string(error.severity))}
+                                ⚠
                               </span>
                             <% end %>
                           </div>
                         </div>
-                      </label>
+                      </div>
+
+                      <%!-- Diagrams List (Expandable) --%>
+                      <%= if is_expanded do %>
+                        <div class="bg-slate-900/30">
+                          <%= if length(concept_diagrams) > 0 do %>
+                            <%= for diagram <- concept_diagrams do %>
+                              <div
+                                class={[
+                                  "pl-8 pr-2 py-2 text-sm cursor-pointer transition border-l-2",
+                                  @selected_diagram && @selected_diagram.id == diagram.id &&
+                                    "bg-blue-900/30 border-blue-500 text-blue-200",
+                                  (!@selected_diagram || @selected_diagram.id != diagram.id) &&
+                                    "border-transparent hover:bg-slate-800/50"
+                                ]}
+                                phx-click="select_diagram"
+                                phx-value-id={diagram.id}
+                              >
+                                → {diagram.title}
+                              </div>
+                            <% end %>
+                          <% else %>
+                            <div class="pl-8 pr-2 py-2 text-sm text-slate-500">
+                              <label class="flex items-center gap-2 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={MapSet.member?(@selected_concepts, concept.id)}
+                                  phx-click="toggle_concept"
+                                  phx-value-id={concept.id}
+                                />
+                                <span>Select to generate</span>
+                              </label>
+                            </div>
+                          <% end %>
+                        </div>
+                      <% end %>
                     </div>
                   <% end %>
 
@@ -429,59 +406,154 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
                 <% end %>
               </div>
             </div>
-          </div>
 
-          <%!-- Right Column: Diagrams --%>
-          <div class="space-y-4">
+            <%!-- Upload Section (Bottom) --%>
             <div class="bg-slate-900 rounded-xl p-4">
-              <h2 class="text-xl font-semibold mb-4">Diagrams</h2>
+              <h2 class="text-lg font-semibold mb-3">Upload Document</h2>
 
-              <%= if @diagrams != [] do %>
-                <div class="space-y-2 mb-4">
-                  <%= for diagram <- @diagrams do %>
-                    <div
-                      class={[
-                        "p-2 rounded cursor-pointer transition",
-                        @selected_diagram && @selected_diagram.id == diagram.id &&
-                          "bg-slate-700",
-                        (!@selected_diagram || @selected_diagram.id != diagram.id) &&
-                          "bg-slate-800 hover:bg-slate-700"
-                      ]}
-                      phx-click="select_diagram"
-                      phx-value-id={diagram.id}
-                    >
-                      <div class="text-sm font-medium">{diagram.title}</div>
-                      <div class="text-xs text-slate-400">{diagram.domain} · {diagram.level}</div>
+              <form phx-change="validate" phx-submit="save" id="upload-form">
+                <div class="space-y-3">
+                  <div
+                    class="border-2 border-dashed border-slate-700 rounded-lg p-4 text-center cursor-pointer hover:border-slate-600 transition"
+                    phx-drop-target={@uploads.document.ref}
+                  >
+                    <.live_file_input upload={@uploads.document} class="hidden" />
+                    <label for={@uploads.document.ref} class="cursor-pointer">
+                      <div class="text-slate-400">
+                        <p class="text-xs">Click or drag PDF/MD</p>
+                      </div>
+                    </label>
+                  </div>
+
+                  <%= for entry <- @uploads.document.entries do %>
+                    <div class="text-xs text-slate-300">
+                      {entry.client_name}
                     </div>
                   <% end %>
-                </div>
-              <% end %>
 
+                  <button
+                    type="submit"
+                    class="w-full px-3 py-2 text-sm bg-blue-600 hover:bg-blue-700 rounded transition"
+                    disabled={@uploads.document.entries == []}
+                  >
+                    Upload
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            <%!-- Documents Section (Bottom) --%>
+            <div class="bg-slate-900 rounded-xl p-4">
+              <h2 class="text-lg font-semibold mb-3">Documents</h2>
+
+              <div class="space-y-2 max-h-48 overflow-y-auto">
+                <%= for doc <- @documents do %>
+                  <div
+                    class={[
+                      "p-2 rounded cursor-pointer transition",
+                      @selected_document && @selected_document.id == doc.id &&
+                        "bg-slate-800 border border-slate-600",
+                      (!@selected_document || @selected_document.id != doc.id) &&
+                        "bg-slate-800/50 hover:bg-slate-800"
+                    ]}
+                    phx-click="select_document"
+                    phx-value-id={doc.id}
+                  >
+                    <div class="flex items-center justify-between mb-1">
+                      <span class="text-xs font-medium truncate">{doc.title}</span>
+                      <span class={[
+                        "text-xs px-1.5 py-0.5 rounded font-medium",
+                        doc.status == :ready && "bg-green-900/50 text-green-300",
+                        doc.status == :processing && "bg-yellow-900/50 text-yellow-300 animate-pulse",
+                        doc.status == :uploaded && "bg-blue-900/50 text-blue-300",
+                        doc.status == :error && "bg-red-900/50 text-red-300"
+                      ]}>
+                        {format_status(doc.status)}
+                      </span>
+                    </div>
+                    <%= if doc.status == :error and doc.error_message do %>
+                      <div class="text-xs text-red-400 mt-1">
+                        {doc.error_message}
+                      </div>
+                    <% end %>
+                  </div>
+                <% end %>
+
+                <%= if @documents == [] do %>
+                  <p class="text-xs text-slate-400 text-center py-4">No documents yet</p>
+                <% end %>
+              </div>
+            </div>
+          </div>
+
+          <%!-- Right Main Area: Diagram Display + Generate --%>
+          <div class="lg:col-span-3 space-y-4 flex flex-col">
+            <%!-- Diagram Display (Top, Large) --%>
+            <div class="bg-slate-900 rounded-xl p-6 flex-1 overflow-auto">
               <%= if @selected_diagram do %>
-                <div class="space-y-3 border-t border-slate-800 pt-4">
-                  <h3 class="font-semibold">{@selected_diagram.title}</h3>
-                  <p class="text-sm text-slate-300">{@selected_diagram.summary}</p>
+                <div class="space-y-4">
+                  <div>
+                    <h2 class="text-2xl font-semibold mb-2">{@selected_diagram.title}</h2>
+                    <p class="text-slate-300">{@selected_diagram.summary}</p>
+                    <div class="flex gap-2 mt-2">
+                      <span class="text-xs px-2 py-1 bg-slate-800 rounded">
+                        {@selected_diagram.domain}
+                      </span>
+                      <span class="text-xs px-2 py-1 bg-slate-800 rounded">
+                        {@selected_diagram.level}
+                      </span>
+                      <%= for tag <- @selected_diagram.tags do %>
+                        <span class="text-xs px-2 py-1 bg-slate-700 rounded">
+                          {tag}
+                        </span>
+                      <% end %>
+                    </div>
+                  </div>
 
                   <div
                     id="mermaid-preview"
                     phx-hook="Mermaid"
-                    class="bg-white rounded p-4"
+                    class="bg-white rounded-lg p-8"
                     data-diagram={@selected_diagram.diagram_source}
                   >
                     <pre class="mermaid">{@selected_diagram.diagram_source}</pre>
                   </div>
 
                   <%= if @selected_diagram.notes_md do %>
-                    <div class="text-sm text-slate-300 prose prose-invert max-w-none">
-                      {raw(@selected_diagram.notes_md)}
+                    <div class="text-sm text-slate-300 bg-slate-800/30 rounded-lg p-4">
+                      <div class="font-semibold mb-2">Notes:</div>
+                      <div class="prose prose-invert prose-sm max-w-none">
+                        {raw(@selected_diagram.notes_md)}
+                      </div>
                     </div>
                   <% end %>
+                </div>
+              <% else %>
+                <div class="h-full flex items-center justify-center text-slate-500">
+                  <div class="text-center">
+                    <svg
+                      class="mx-auto h-16 w-16 mb-4 opacity-50"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="1.5"
+                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                      />
+                    </svg>
+                    <p class="text-lg">Select a diagram to view</p>
+                    <p class="text-sm mt-1">Click on a diagram from the concepts tree</p>
+                  </div>
                 </div>
               <% end %>
             </div>
 
+            <%!-- Generate from Prompt (Bottom) --%>
             <div class="bg-slate-900 rounded-xl p-4">
-              <h2 class="text-xl font-semibold mb-4">Generate from Prompt</h2>
+              <h2 class="text-xl font-semibold mb-3">Generate from Prompt</h2>
 
               <form phx-submit="generate_from_prompt" class="space-y-3">
                 <textarea
@@ -490,7 +562,7 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
                   phx-change="update_prompt"
                   placeholder="e.g., Create a diagram showing how GenServer handles messages"
                   class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded focus:border-slate-600 focus:outline-none resize-y"
-                  rows="4"
+                  rows="3"
                   disabled={@generating}
                 />
 
@@ -536,6 +608,20 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
           </div>
         </div>
       </div>
+
+      <%!-- Full-width Footer --%>
+      <div class="bg-slate-900 border-t border-slate-800">
+        <div class="container mx-auto px-4 py-4">
+          <div class="text-sm text-slate-400">
+            <div class="font-semibold text-slate-300 mb-2">💡 Tips & Shortcuts</div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
+              <div>• Click concept names to expand/collapse diagram lists</div>
+              <div>• Select diagrams to view them in the main area</div>
+              <div>• Use "Generate from Prompt" for custom diagrams</div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
     """
   end
@@ -565,5 +651,9 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
       :error -> "Error"
       _ -> to_string(status)
     end
+  end
+
+  defp diagrams_for_concept(diagrams, concept_id) do
+    Enum.filter(diagrams, fn d -> d.concept_id == concept_id end)
   end
 end
