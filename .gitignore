@@ -35,3 +35,6 @@ diagram_forge-*.tar
 npm-debug.log
 /assets/node_modules/
 
+# macOS-specific files
+.DS_Store
+

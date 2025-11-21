@@ -55,21 +55,21 @@ concepts = [
   %{
     name: "Demand forecasting API architecture",
     short_description: "Integrating forecasting models with order and inventory data via an API.",
-    category: "logistics",
+    category: "operations",
     level: :intermediate,
     importance: 5
   },
   %{
     name: "Intelligent routing ML pipeline",
-    short_description: "Using ML to generate and rank routing options for logistics decisions.",
-    category: "logistics",
+    short_description: "Using ML to generate and rank routing options for operational decisions.",
+    category: "operations",
     level: :advanced,
     importance: 5
   },
   %{
     name: "Supply chain anomaly detection loop",
     short_description: "Streaming operational events into an anomaly detector and alerting ops teams.",
-    category: "logistics",
+    category: "operations",
     level: :intermediate,
     importance: 4
   },
@@ -123,23 +123,23 @@ concepts = [
     importance: 4
   },
   %{
-    name: "Event sourcing in logistics workflows",
-    short_description: "Modeling logistics processes as event streams with projections for read models.",
-    category: "logistics",
+    name: "Event sourcing in operational workflows",
+    short_description: "Modeling business processes as event streams with projections for read models.",
+    category: "operations",
     level: :advanced,
     importance: 4
   },
   %{
     name: "Inventory and WMS/OMS/TMS data flow",
     short_description: "How inventory, order management, warehouse, and transportation systems interact.",
-    category: "logistics",
+    category: "operations",
     level: :beginner,
     importance: 4
   },
   %{
     name: "Real-time routing decision architecture",
     short_description: "Combining ML routing models with a policy engine for real-time route selection.",
-    category: "logistics",
+    category: "operations",
     level: :advanced,
     importance: 5
   },
@@ -165,8 +165,8 @@ concepts = [
     importance: 5
   },
   %{
-    name: "LLM tool-calling workflow for logistics",
-    short_description: "Using an LLM to orchestrate calls to logistics tools like order status and rate lookup.",
+    name: "LLM tool-calling workflow for operations",
+    short_description: "Using an LLM to orchestrate calls to operational tools like order status and rate lookup.",
     category: "ml",
     level: :advanced,
     importance: 4

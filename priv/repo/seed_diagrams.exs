@@ -1,13 +1,251 @@
-Below is a **ready-to-use Elixir seeds snippet** with **25 diagrams**.
+# Script for populating the database with sample concepts and diagrams.
+# Run via: mix seed.diagrams
 
-* Each entry has: `title`, `slug`, `domain`, `level`, `tags`, `format`, `diagram_source`, `summary`, `notes_md`.
-* `diagram_source` is **pure Mermaid** (no backticks).
-* You can drop this into `priv/repo/seeds.exs` (or a separate module) and adapt to your schema names.
+alias DiagramForge.Repo
+alias DiagramForge.Diagrams.{Document, Concept, Diagram}
 
----
+# Clear existing data (optional - comment out if you want to keep existing data)
+IO.puts("Clearing existing diagrams, concepts, and documents...")
+Repo.delete_all(Diagram)
+Repo.delete_all(Concept)
+Repo.delete_all(Document)
 
-```elixir
-diagrams = [
+# Create a seed document
+IO.puts("Creating seed document...")
+
+document =
+  %Document{}
+  |> Document.changeset(%{
+    title: "Software Architecture and ML Integration Patterns",
+    source_type: :markdown,
+    path: "docs/technical-concepts.md",
+    status: :ready,
+    raw_text: """
+    This document contains 25 technical concepts covering Elixir/OTP distributed systems,
+    machine learning integration, event-driven architectures, and infrastructure patterns
+    commonly used in modern production systems.
+    """
+  })
+  |> Repo.insert!()
+
+IO.puts("Document created with ID: #{document.id}")
+
+# Define concepts
+concepts_data = [
+  %{
+    name: "GenServer call vs cast",
+    short_description:
+      "How synchronous call and asynchronous cast interact with a GenServer and their trade-offs.",
+    category: "elixir",
+    level: :intermediate,
+    importance: 5
+  },
+  %{
+    name: "OTP supervision tree basics",
+    short_description:
+      "How supervisors organize workers into trees and apply different restart strategies.",
+    category: "elixir",
+    level: :intermediate,
+    importance: 5
+  },
+  %{
+    name: "Fault tolerance with Elixir processes",
+    short_description:
+      "Letting processes crash and using supervisors to restart them for fault isolation.",
+    category: "elixir",
+    level: :intermediate,
+    importance: 5
+  },
+  %{
+    name: "Kafka and Broadway event-driven processing",
+    short_description:
+      "Using Kafka topics and Broadway pipelines to process streams of events in Elixir.",
+    category: "elixir",
+    level: :intermediate,
+    importance: 5
+  },
+  %{
+    name: "Prediction-serving API with fallback logic",
+    short_description:
+      "Designing a prediction API with cache, cloud ML calls, and local fallback behavior.",
+    category: "ml",
+    level: :advanced,
+    importance: 5
+  },
+  %{
+    name: "Cloud ML inference with Vertex AI",
+    short_description:
+      "Calling a managed Vertex AI endpoint from an Elixir service using feature data.",
+    category: "ml",
+    level: :intermediate,
+    importance: 4
+  },
+  %{
+    name: "Edge vs cloud inference architecture",
+    short_description:
+      "Balancing latency, accuracy, and cost between edge inference and cloud inference.",
+    category: "ml",
+    level: :intermediate,
+    importance: 4
+  },
+  %{
+    name: "Demand forecasting API architecture",
+    short_description:
+      "Integrating forecasting models with order and inventory data via an API.",
+    category: "operations",
+    level: :intermediate,
+    importance: 5
+  },
+  %{
+    name: "Intelligent routing ML pipeline",
+    short_description: "Using ML to generate and rank routing options for operational decisions.",
+    category: "operations",
+    level: :advanced,
+    importance: 5
+  },
+  %{
+    name: "Supply chain anomaly detection loop",
+    short_description:
+      "Streaming operational events into an anomaly detector and alerting ops teams.",
+    category: "operations",
+    level: :intermediate,
+    importance: 4
+  },
+  %{
+    name: "Caching ML predictions with ETS and Redis",
+    short_description: "A two-level cache using ETS and Redis to reduce repeated ML calls.",
+    category: "elixir",
+    level: :intermediate,
+    importance: 5
+  },
+  %{
+    name: "Rate limiting LLM API requests",
+    short_description:
+      "Using a gateway and rate limiter to protect external LLM providers and enforce quotas.",
+    category: "infra",
+    level: :intermediate,
+    importance: 4
+  },
+  %{
+    name: "Semantic search with embeddings and vector DB",
+    short_description:
+      "Generating embeddings and using a vector database to find semantically similar items.",
+    category: "ml",
+    level: :intermediate,
+    importance: 5
+  },
+  %{
+    name: "Observability pipeline for ML-powered services",
+    short_description:
+      "Collecting logs, metrics, and traces from services into observability backends.",
+    category: "infra",
+    level: :intermediate,
+    importance: 4
+  },
+  %{
+    name: "Circuit breaker and retry around ML calls",
+    short_description:
+      "Protecting services that call ML endpoints using retries and circuit breakers.",
+    category: "infra",
+    level: :intermediate,
+    importance: 4
+  },
+  %{
+    name: "Real-time data pipeline feeding ML features",
+    short_description:
+      "Streaming operational events into feature stores for online and offline ML.",
+    category: "ml",
+    level: :intermediate,
+    importance: 5
+  },
+  %{
+    name: "Postgres indexing for analytics queries",
+    short_description:
+      "Using BTREE, GIN/GIST indexes and partitioning to speed up analytics workloads.",
+    category: "infra",
+    level: :intermediate,
+    importance: 4
+  },
+  %{
+    name: "Event sourcing in operational workflows",
+    short_description:
+      "Modeling business processes as event streams with projections for read models.",
+    category: "operations",
+    level: :advanced,
+    importance: 4
+  },
+  %{
+    name: "Inventory and WMS/OMS/TMS data flow",
+    short_description:
+      "How inventory, order management, warehouse, and transportation systems interact.",
+    category: "operations",
+    level: :beginner,
+    importance: 4
+  },
+  %{
+    name: "Real-time routing decision architecture",
+    short_description:
+      "Combining ML routing models with a policy engine for real-time route selection.",
+    category: "operations",
+    level: :advanced,
+    importance: 5
+  },
+  %{
+    name: "ML model lifecycle from training to monitoring",
+    short_description:
+      "The end-to-end lifecycle of an ML model: data, training, deployment, and monitoring.",
+    category: "ml",
+    level: :beginner,
+    importance: 4
+  },
+  %{
+    name: "Autoscaling inference services",
+    short_description:
+      "Scaling inference services horizontally based on load and performance metrics.",
+    category: "infra",
+    level: :intermediate,
+    importance: 4
+  },
+  %{
+    name: "Feature store for real-time ML",
+    short_description:
+      "Using online and offline feature stores to support training and low-latency inference.",
+    category: "ml",
+    level: :intermediate,
+    importance: 5
+  },
+  %{
+    name: "LLM tool-calling workflow for operations",
+    short_description:
+      "Using an LLM to orchestrate calls to operational tools like order status and rate lookup.",
+    category: "ml",
+    level: :advanced,
+    importance: 4
+  },
+  %{
+    name: "Multi-layer fallback: cache, edge, cloud",
+    short_description:
+      "A layered fallback strategy from cache to edge inference to cloud inference.",
+    category: "infra",
+    level: :intermediate,
+    importance: 4
+  }
+]
+
+# Insert concepts
+IO.puts("Inserting #{length(concepts_data)} concepts...")
+
+concepts =
+  Enum.map(concepts_data, fn concept_attrs ->
+    %Concept{}
+    |> Concept.changeset(Map.put(concept_attrs, :document_id, document.id))
+    |> Repo.insert!()
+  end)
+
+IO.puts("Concepts created successfully")
+
+# Define diagrams (matched to concepts by index)
+diagrams_data = [
   %{
     title: "GenServer Call vs Cast",
     slug: "genserver-call-vs-cast",
@@ -477,7 +715,7 @@ diagrams = [
     """
   },
   %{
-    title: "Event Sourcing in Operations Workflows",
+    title: "Event Sourcing in Operational Workflows",
     slug: "event-sourcing-operations",
     domain: "operations",
     level: :advanced,
@@ -492,7 +730,7 @@ diagrams = [
       EVTS --> PRJ2[Projection<br/>Shipment Timeline]
       EVTS --> PRJ3[Projection<br/>Analytics Views]
     """,
-    summary: "Shows how event sourcing models operations workflows using an event store and projections.",
+    summary: "Shows how event sourcing models operational workflows using an event store and projections.",
     notes_md: """
     - Commands mutate aggregates which emit events.
     - Events are stored immutably in an event store.
@@ -659,12 +897,12 @@ diagrams = [
 
       L-->>U: Final structured response<br/>(status + best route)
     """,
-    summary: "Demonstrates how an LLM orchestrates multiple tools to answer a operations-related request.",
+    summary: "Demonstrates how an LLM orchestrates multiple tools to answer an operational request.",
     notes_md: """
     - LLM interprets user intent and selects tools to call.
     - Tools encapsulate deterministic business logic and data access.
     - LLM combines tool outputs into a final answer or decision.
-    - This pattern is useful for conversational operations assistants.
+    - This pattern is useful for conversational operational assistants.
     """
   },
   %{
@@ -695,4 +933,31 @@ diagrams = [
     """
   }
 ]
-```
+
+# Insert diagrams
+IO.puts("Inserting #{length(diagrams_data)} diagrams...")
+
+Enum.zip(concepts, diagrams_data)
+|> Enum.each(fn {concept, diagram_attrs} ->
+  %Diagram{}
+  |> Diagram.changeset(
+    diagram_attrs
+    |> Map.put(:concept_id, concept.id)
+    |> Map.put(:document_id, document.id)
+  )
+  |> Repo.insert!()
+end)
+
+IO.puts("Diagrams created successfully")
+
+IO.puts("""
+
+✅ Seed complete!
+
+Summary:
+- 1 document created
+- #{length(concepts)} concepts created
+- #{length(diagrams_data)} diagrams created
+
+All concepts and diagrams are linked to the seed document.
+""")

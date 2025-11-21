@@ -66,7 +66,7 @@ List of concepts
 ### ★ Must-haves
 
 * **Design of prediction-serving APIs (REST, gRPC optional)**
-* **Event-driven architecture between logistics services**
+* **Event-driven architecture between operations services**
 * **Webhook patterns for async model outputs**
 * **API rate-limiting + autoscaling**
 * **Edge API integration (Cloudflare Workers / Serverless patterns)**
@@ -79,7 +79,7 @@ List of concepts
 
 ---
 
-# ✅ 5. **Logistics / E-commerce / Supply Chain Domain Concepts**
+# ✅ 5. **Operations / E-commerce / Supply Chain Domain Concepts**
 
 They said they prefer candidates with domain intuition. Possible questions:
 
@@ -129,7 +129,7 @@ They said they prefer candidates with domain intuition. Possible questions:
 
 * “LLM integration architecture with rate limiting”
 * “Semantic search with vector DB + embedding pipeline”
-* “Prompt + tool-call pattern for logistics recommendations”
+* “Prompt + tool-call pattern for operations recommendations”
 
 ---
 
@@ -203,13 +203,13 @@ Here are the **top 25 diagrams you should generate first** — they map 1:1 to w
 15. Circuit breaker + retry patterns around ML calls
 16. Real-time data pipeline feeding ML features
 17. Postgres indexing strategy for analytics queries
-18. Event sourcing in logistics workflows
+18. Event sourcing in operations workflows
 19. Inventory → WMS → OMS → TMS data flow
 20. Architecture for real-time routing decisions
 21. ML model lifecycle: training → deployment → inference
 22. Autoscaling inference services
 23. Feature store overview (batch + streaming)
-24. LLM tool-calling workflow for logistics recommendations
+24. LLM tool-calling workflow for operations recommendations
 25. Multi-layer fallback strategy (cache → edge → cloud)
 
 
