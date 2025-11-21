@@ -34,6 +34,7 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
      |> assign(:generating_concepts, MapSet.new())
      |> assign(:generation_total, 0)
      |> assign(:generation_completed, 0)
+     |> assign(:failed_generations, %{})
      |> allow_upload(:document,
        accept: ~w(.pdf .md .markdown),
        max_entries: 1,
@@ -61,7 +62,8 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
      |> assign(:selected_diagram, nil)
      |> assign(:generating_concepts, MapSet.new())
      |> assign(:generation_total, 0)
-     |> assign(:generation_completed, 0)}
+     |> assign(:generation_completed, 0)
+     |> assign(:failed_generations, %{})}
   end
 
   @impl true
@@ -100,7 +102,8 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
      |> assign(:selected_concepts, MapSet.new())
      |> assign(:generating_concepts, selected_concept_ids)
      |> assign(:generation_total, MapSet.size(selected_concept_ids))
-     |> assign(:generation_completed, 0)}
+     |> assign(:generation_completed, 0)
+     |> assign(:failed_generations, %{})}
   end
 
   @impl true
@@ -230,12 +233,21 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
   end
 
   @impl true
-  def handle_info({:generation_failed, concept_id, reason}, socket) do
+  def handle_info({:generation_failed, concept_id, reason, category, severity}, socket) do
     generating_concepts = MapSet.delete(socket.assigns.generating_concepts, concept_id)
+
+    # Store the error details
+    failed_generations =
+      Map.put(socket.assigns.failed_generations, concept_id, %{
+        reason: reason,
+        category: category,
+        severity: severity
+      })
 
     {:noreply,
      socket
      |> assign(:generating_concepts, generating_concepts)
+     |> assign(:failed_generations, failed_generations)
      |> put_flash(:error, "Failed to generate diagram: #{inspect(reason)}")}
   end
 
@@ -342,7 +354,7 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
                 <% end %>
               </div>
 
-              <%= if @generation_total > 0 do %>
+              <%= if @generation_total > 0 and MapSet.size(@generating_concepts) > 0 do %>
                 <div class="mb-4 p-3 bg-blue-900/30 border border-blue-700/50 rounded-lg">
                   <div class="flex items-center justify-between text-sm">
                     <span class="text-blue-300">
@@ -383,6 +395,18 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
                             <span class="text-xs px-2 py-1 bg-slate-700 rounded">
                               {concept.level}
                             </span>
+                            <%= if Map.has_key?(@failed_generations, concept.id) do %>
+                              <% error = @failed_generations[concept.id] %>
+                              <span class={[
+                                "text-xs px-2 py-1 rounded font-semibold",
+                                error.severity == :critical && "bg-red-900/50 text-red-300",
+                                error.severity == :high && "bg-orange-900/50 text-orange-300",
+                                error.severity == :medium && "bg-yellow-900/50 text-yellow-300",
+                                error.severity == :low && "bg-blue-900/50 text-blue-300"
+                              ]}>
+                                ⚠ {String.upcase(to_string(error.severity))}
+                              </span>
+                            <% end %>
                           </div>
                         </div>
                       </label>

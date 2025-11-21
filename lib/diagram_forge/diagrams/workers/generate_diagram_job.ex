@@ -6,6 +6,7 @@ defmodule DiagramForge.Diagrams.Workers.GenerateDiagramJob do
   use Oban.Worker, queue: :diagrams
 
   alias DiagramForge.Diagrams.{Concept, DiagramGenerator}
+  alias DiagramForge.ErrorHandling.ErrorCategorizer
   alias DiagramForge.Repo
 
   @impl Oban.Worker
@@ -38,11 +39,14 @@ defmodule DiagramForge.Diagrams.Workers.GenerateDiagramJob do
           :ok
 
         {:error, reason} ->
-          # Broadcast generation failed
+          # Categorize the error
+          {category, severity} = ErrorCategorizer.categorize_error({:error, reason})
+
+          # Broadcast generation failed with error details
           Phoenix.PubSub.broadcast(
             DiagramForge.PubSub,
             "diagram_generation:#{document_id}",
-            {:generation_failed, concept_id, reason}
+            {:generation_failed, concept_id, reason, category, severity}
           )
 
           {:error, reason}

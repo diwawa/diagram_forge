@@ -442,4 +442,341 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
              |> has_element?()
     end
   end
+
+  describe "generation progress tracking" do
+    test "displays progress bar during diagram generation", %{conn: conn} do
+      document = fixture(:document)
+      concept1 = fixture(:concept, document_id: document.id)
+      concept2 = fixture(:concept, document_id: document.id)
+
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      view
+      |> element("[phx-value-id='#{document.id}']")
+      |> render_click()
+
+      # Select both concepts
+      view
+      |> element("input[phx-value-id='#{concept1.id}']")
+      |> render_click()
+
+      view
+      |> element("input[phx-value-id='#{concept2.id}']")
+      |> render_click()
+
+      # Generate diagrams
+      view
+      |> element("button", "Generate (2)")
+      |> render_click()
+
+      html = render(view)
+
+      # Verify progress bar appears
+      assert html =~ "Generating diagrams: 0 of 2"
+    end
+
+    test "updates progress when generation completes", %{conn: conn} do
+      document = fixture(:document)
+      concept = fixture(:concept, document_id: document.id)
+
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      view
+      |> element("[phx-value-id='#{document.id}']")
+      |> render_click()
+
+      view
+      |> element("input[phx-value-id='#{concept.id}']")
+      |> render_click()
+
+      view
+      |> element("button", "Generate (1)")
+      |> render_click()
+
+      # Verify progress bar appears initially
+      assert render(view) =~ "Generating diagrams: 0 of 1"
+
+      # Create a diagram and simulate completion event
+      diagram = fixture(:diagram, document_id: document.id, concept_id: concept.id)
+
+      send(
+        view.pid,
+        {:generation_completed, concept.id, diagram.id}
+      )
+
+      :timer.sleep(50)
+
+      html = render(view)
+
+      # Verify progress bar disappears after all generations complete
+      refute html =~ "Generating diagrams:"
+
+      # Verify diagram appears in list
+      assert html =~ diagram.title
+    end
+
+    test "handles generation_started event", %{conn: conn} do
+      document = fixture(:document)
+      concept = fixture(:concept, document_id: document.id)
+
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      view
+      |> element("[phx-value-id='#{document.id}']")
+      |> render_click()
+
+      # Simulate generation started
+      send(view.pid, {:generation_started, concept.id})
+
+      :timer.sleep(50)
+
+      # Should not crash - this is a no-op event
+      assert view |> element("h1", "DiagramForge Studio") |> has_element?()
+    end
+
+    test "handles generation_failed event with error details", %{conn: conn} do
+      document = fixture(:document)
+      concept = fixture(:concept, document_id: document.id, name: "Test Concept")
+
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      view
+      |> element("[phx-value-id='#{document.id}']")
+      |> render_click()
+
+      view
+      |> element("input[phx-value-id='#{concept.id}']")
+      |> render_click()
+
+      view
+      |> element("button", "Generate (1)")
+      |> render_click()
+
+      # Simulate generation failure with error details
+      send(
+        view.pid,
+        {:generation_failed, concept.id, %{status: 503}, :transient, :medium}
+      )
+
+      :timer.sleep(50)
+
+      html = render(view)
+
+      # Verify error severity badge appears
+      assert html =~ "MEDIUM"
+      assert html =~ "⚠"
+
+      # Verify concept is no longer in generating_concepts
+      refute html =~ "Generating diagrams:"
+    end
+
+    test "resets progress tracking when switching documents", %{conn: conn} do
+      doc1 = fixture(:document, title: "Doc 1")
+      doc2 = fixture(:document, title: "Doc 2")
+      concept1 = fixture(:concept, document_id: doc1.id)
+      _concept2 = fixture(:concept, document_id: doc2.id)
+
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      # Select first document and start generation
+      view
+      |> element("[phx-value-id='#{doc1.id}']")
+      |> render_click()
+
+      view
+      |> element("input[phx-value-id='#{concept1.id}']")
+      |> render_click()
+
+      view
+      |> element("button", "Generate (1)")
+      |> render_click()
+
+      # Verify progress bar appears
+      assert render(view) =~ "Generating diagrams: 0 of 1"
+
+      # Switch to second document
+      view
+      |> element("[phx-value-id='#{doc2.id}']")
+      |> render_click()
+
+      # Verify progress was reset
+      refute render(view) =~ "Generating diagrams:"
+    end
+  end
+
+  describe "error severity badges" do
+    test "displays critical severity badge in red", %{conn: conn} do
+      document = fixture(:document)
+      concept = fixture(:concept, document_id: document.id, name: "Failed Concept")
+
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      view
+      |> element("[phx-value-id='#{document.id}']")
+      |> render_click()
+
+      view
+      |> element("input[phx-value-id='#{concept.id}']")
+      |> render_click()
+
+      view
+      |> element("button", "Generate (1)")
+      |> render_click()
+
+      # Simulate critical authentication failure
+      send(
+        view.pid,
+        {:generation_failed, concept.id, %{status: 401}, :authentication, :critical}
+      )
+
+      :timer.sleep(50)
+
+      html = render(view)
+
+      # Verify critical badge with red styling
+      assert html =~ "CRITICAL"
+      assert html =~ "bg-red-900/50"
+    end
+
+    test "displays high severity badge in orange", %{conn: conn} do
+      document = fixture(:document)
+      concept = fixture(:concept, document_id: document.id)
+
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      view
+      |> element("[phx-value-id='#{document.id}']")
+      |> render_click()
+
+      view
+      |> element("input[phx-value-id='#{concept.id}']")
+      |> render_click()
+
+      view
+      |> element("button", "Generate (1)")
+      |> render_click()
+
+      # Simulate high severity rate limit error
+      send(
+        view.pid,
+        {:generation_failed, concept.id, %{status: 429}, :rate_limit, :high}
+      )
+
+      :timer.sleep(50)
+
+      html = render(view)
+
+      # Verify high severity badge with orange styling
+      assert html =~ "HIGH"
+      assert html =~ "bg-orange-900/50"
+    end
+
+    test "displays medium severity badge in yellow", %{conn: conn} do
+      document = fixture(:document)
+      concept = fixture(:concept, document_id: document.id)
+
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      view
+      |> element("[phx-value-id='#{document.id}']")
+      |> render_click()
+
+      view
+      |> element("input[phx-value-id='#{concept.id}']")
+      |> render_click()
+
+      view
+      |> element("button", "Generate (1)")
+      |> render_click()
+
+      # Simulate medium severity transient error
+      send(
+        view.pid,
+        {:generation_failed, concept.id, %{status: 503}, :transient, :medium}
+      )
+
+      :timer.sleep(50)
+
+      html = render(view)
+
+      # Verify medium severity badge with yellow styling
+      assert html =~ "MEDIUM"
+      assert html =~ "bg-yellow-900/50"
+    end
+
+    test "displays low severity badge in blue", %{conn: conn} do
+      document = fixture(:document)
+      concept = fixture(:concept, document_id: document.id)
+
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      view
+      |> element("[phx-value-id='#{document.id}']")
+      |> render_click()
+
+      view
+      |> element("input[phx-value-id='#{concept.id}']")
+      |> render_click()
+
+      view
+      |> element("button", "Generate (1)")
+      |> render_click()
+
+      # Simulate low severity permanent error
+      send(
+        view.pid,
+        {:generation_failed, concept.id, %{status: 404}, :permanent, :low}
+      )
+
+      :timer.sleep(50)
+
+      html = render(view)
+
+      # Verify low severity badge with blue styling
+      assert html =~ "LOW"
+      assert html =~ "bg-blue-900/50"
+    end
+
+    test "clears error badges when generating new diagrams", %{conn: conn} do
+      document = fixture(:document)
+      concept = fixture(:concept, document_id: document.id)
+
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      view
+      |> element("[phx-value-id='#{document.id}']")
+      |> render_click()
+
+      view
+      |> element("input[phx-value-id='#{concept.id}']")
+      |> render_click()
+
+      view
+      |> element("button", "Generate (1)")
+      |> render_click()
+
+      # Simulate failure
+      send(
+        view.pid,
+        {:generation_failed, concept.id, %{status: 503}, :transient, :medium}
+      )
+
+      :timer.sleep(50)
+
+      # Verify error badge appears
+      assert render(view) =~ "MEDIUM"
+
+      # Regenerate
+      view
+      |> element("input[phx-value-id='#{concept.id}']")
+      |> render_click()
+
+      view
+      |> element("button", "Generate (1)")
+      |> render_click()
+
+      # Verify error badge was cleared
+      refute render(view) =~ "MEDIUM"
+    end
+  end
 end
