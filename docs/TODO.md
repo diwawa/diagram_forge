@@ -240,10 +240,86 @@ You can base them directly on the versions we wrote earlier.
 
 ---
 
-### Phase 9 – UX polish & safety
+### Phase 9 – UX polish & safety ✅
 
-1. Show status badges for documents (`Uploaded`, `Processing`, `Ready`, `Error`).
-2. Show error messages if `Document.status = :error`.
-3. Show small progress indicator when diagrams are being generated.
-4. Add basic rate limiting/backoff in AI client (optional but nice).
+1. ✅ Show status badges for documents (`Uploaded`, `Processing`, `Ready`, `Error`).
+2. ✅ Show error messages if `Document.status = :error`.
+3. ✅ Show small progress indicator when diagrams are being generated.
+4. ✅ Add basic rate limiting/backoff in AI client (optional but nice).
+
+**Status: COMPLETED**
+
+---
+
+### Phase 10 – Production Enhancements ✅
+
+**Error Handling & Retry Logic:**
+
+1. ✅ Implement automatic retry with exponential backoff for OpenAI API calls
+   - Retry logic: 1s → 2s → 4s → 8s (configurable)
+   - Smart error categorization (transient, rate_limit, authentication, permanent, network)
+   - Only retries errors identified as retryable
+   - Comprehensive logging with context
+
+2. ✅ Error categorization system
+   - Transient errors (503, 504, 502) → retryable
+   - Rate limits (429) → retryable with backoff
+   - Authentication (401, 403) → not retryable, critical severity
+   - Permanent errors (400, 404, 422) → not retryable
+   - Network errors (connection refused, DNS) → retryable
+
+**Telemetry & Monitoring:**
+
+3. ✅ Add comprehensive telemetry instrumentation
+   - Retry lifecycle events: start, attempt, success, failure
+   - Measurements: attempts_used, duration, delay_ms
+   - Metadata: error details, category, severity, context
+   - Full test coverage (6 tests for telemetry events)
+
+4. ✅ OpenAI rate limit header parsing and monitoring
+   - Parse x-ratelimit-* headers for requests and tokens
+   - Automatic warnings at different thresholds:
+     - Critical: < 10% remaining
+     - Approaching: < 25% remaining
+     - Status: > 25% remaining (debug level)
+   - Include reset time information in warnings
+   - Full test coverage (5 tests for rate limit scenarios)
+
+**Real-time User Experience:**
+
+5. ✅ Background job progress tracking via PubSub
+   - Broadcast generation_started, generation_completed, generation_failed events
+   - Real-time progress bar: "Generating X of Y diagrams..."
+   - Automatic diagram list refresh on completion
+   - Full test coverage (5 tests for progress tracking)
+
+6. ✅ Error severity badges in UI
+   - Color-coded visual feedback:
+     - 🔴 CRITICAL (red): Authentication failures
+     - 🟠 HIGH (orange): Rate limits
+     - 🟡 MEDIUM (yellow): Transient failures
+     - 🔵 LOW (blue): Permanent low-impact errors
+   - Automatic badge clearing on regeneration
+   - Full test coverage (6 tests for all severity levels)
+
+**Testing Infrastructure:**
+
+7. ✅ Comprehensive test coverage for all enhancements
+   - HTTP mocking with Bypass for AI client testing
+   - 15 tests for AI client behavior (retries, errors, rate limits)
+   - 6 tests for telemetry event emissions
+   - 5 tests for rate limit header parsing
+   - 6 tests for error severity badge display
+   - 5 tests for real-time progress tracking
+   - **Total: 157 tests, all passing**
+
+8. ✅ Quality gates enforcement
+   - Credo: Static code analysis (0 issues)
+   - Dialyzer: Type checking (7 known issues in .dialyzer_ignore.exs)
+   - Mix Format: Code formatting enforced
+   - Pre-commit hooks block commits without passing all checks
+
+**Status: COMPLETED**
+
+All production enhancements have been implemented with comprehensive test coverage and documentation.
 

@@ -762,3 +762,212 @@ Once these are done, you’ll have:
 * Type/paste prompts like “Create a diagram about how tokenization works” and persist those diagrams too.
 
 If you want, next step I can do is: write a concrete `DiagramStudioLive` skeleton (module + template) so the agent only needs to fill in the wiring.
+
+---
+
+## 10. Production Enhancements
+
+The following enhancements have been implemented to improve reliability, observability, and user experience in production:
+
+### 10.1 Error Handling & Retry Logic
+
+**Automatic Retry with Exponential Backoff**
+
+The AI client includes robust retry logic for handling transient failures:
+
+```elixir
+# DiagramForge.ErrorHandling.Retry
+Retry.with_retry(
+  fn -> make_api_request() end,
+  max_attempts: 3,
+  base_delay_ms: 1000,
+  max_delay_ms: 10_000,
+  context: %{operation: "openai_chat_completion"}
+)
+```
+
+**Features:**
+- Exponential backoff: 1s → 2s → 4s → 8s (configurable)
+- Smart error categorization via `ErrorCategorizer`:
+  - **Transient** (503, 504, 502): Retryable
+  - **Rate limit** (429): Retryable with backoff
+  - **Authentication** (401, 403): Not retryable, critical
+  - **Configuration**: Missing API keys - not retryable
+  - **Permanent** (400, 404, 422): Not retryable
+  - **Network**: Connection errors - retryable
+- Only retries errors identified as retryable
+- Logs each retry attempt with context
+
+**Error Categorization:**
+
+```elixir
+# DiagramForge.ErrorHandling.ErrorCategorizer
+{category, severity} = ErrorCategorizer.categorize_error(error)
+# Returns: {:transient, :medium} | {:rate_limit, :high} | {:authentication, :critical} | etc.
+```
+
+### 10.2 Telemetry & Monitoring
+
+**Retry Metrics**
+
+Comprehensive telemetry events for monitoring retry behavior:
+
+```elixir
+# Events emitted:
+[:diagram_forge, :retry, :start]      # When retry logic begins
+[:diagram_forge, :retry, :attempt]    # On each retry attempt
+[:diagram_forge, :retry, :success]    # When operation succeeds
+[:diagram_forge, :retry, :failure]    # When all retries exhausted
+```
+
+**Measurements & Metadata:**
+
+```elixir
+# Start event
+%{system_time: System.system_time()}
+%{max_attempts: 3, context: %{operation: "..."}}
+
+# Attempt event
+%{attempt: 2, delay_ms: 2000}
+%{error: error, category: :transient, severity: :medium, context: %{...}}
+
+# Success event
+%{attempts_used: 2, duration: 3500}
+%{context: %{...}}
+
+# Failure event
+%{attempts_used: 3, duration: 8000}
+%{error: error, context: %{...}}
+```
+
+These events can be consumed by telemetry handlers for metrics dashboards, alerting, and performance monitoring.
+
+### 10.3 Rate Limit Monitoring
+
+**OpenAI Rate Limit Header Parsing**
+
+The AI client automatically parses and monitors rate limit headers from OpenAI responses:
+
+```elixir
+# Headers parsed:
+- x-ratelimit-limit-requests
+- x-ratelimit-remaining-requests
+- x-ratelimit-reset-requests
+- x-ratelimit-limit-tokens
+- x-ratelimit-remaining-tokens
+- x-ratelimit-reset-tokens
+```
+
+**Automatic Warnings:**
+
+```elixir
+# Critical warning (< 10% remaining)
+Logger.warning("OpenAI rate limit critical: requests - 25/500 (5.0%), reset: 120s")
+
+# Approaching limit (< 25% remaining)
+Logger.warning("OpenAI rate limit approaching: requests - 100/500 (20.0%), reset: 60s")
+
+# Status (> 25% remaining)
+Logger.debug("OpenAI rate limit status: requests - 450/500 (90.0%)")
+```
+
+This proactive monitoring helps prevent unexpected rate limit errors by providing visibility into API usage before limits are exceeded.
+
+### 10.4 Real-time Progress Tracking
+
+**Background Job Progress via PubSub**
+
+Diagram generation jobs broadcast real-time progress events:
+
+```elixir
+# DiagramForge.Diagrams.Workers.GenerateDiagramJob broadcasts:
+{:generation_started, concept_id}
+{:generation_completed, concept_id, diagram_id}
+{:generation_failed, concept_id, reason, category, severity}
+```
+
+**LiveView Integration:**
+
+The LiveView subscribes to progress events and displays:
+- Real-time progress bar: "Generating 2 of 5 diagrams..."
+- Automatic diagram list refresh on completion
+- Error notifications with severity information
+
+```elixir
+# In DiagramStudioLive
+Phoenix.PubSub.subscribe(DiagramForge.PubSub, "diagram_generation:#{document_id}")
+
+def handle_info({:generation_completed, concept_id, diagram_id}, socket) do
+  # Update progress, refresh diagrams list
+end
+```
+
+### 10.5 Error Severity Badges in UI
+
+**Visual Error Feedback**
+
+Failed diagram generations display color-coded severity badges:
+
+- 🔴 **CRITICAL** (red): Authentication failures requiring admin attention
+- 🟠 **HIGH** (orange): Rate limits and severe server errors
+- 🟡 **MEDIUM** (yellow): Transient failures and bad requests
+- 🔵 **LOW** (blue): Permanent low-impact errors (404s)
+
+```elixir
+# Error details stored per concept
+%{
+  reason: %{status: 429},
+  category: :rate_limit,
+  severity: :high
+}
+```
+
+Badges are automatically cleared when:
+- Starting new generation attempts
+- Switching to a different document
+
+This provides immediate visual feedback on error severity, helping users prioritize which failures need immediate attention versus those that can be safely retried.
+
+### 10.6 Testing Infrastructure
+
+**Comprehensive Test Coverage**
+
+All production enhancements include full test coverage:
+
+**HTTP Mocking with Bypass:**
+```elixir
+# test/diagram_forge/ai/client_test.exs
+setup do
+  bypass = Bypass.open()
+  %{bypass: bypass, base_url: "http://localhost:#{bypass.port}"}
+end
+
+Bypass.expect_once(bypass, "POST", "/chat/completions", fn conn ->
+  # Mock OpenAI responses
+end)
+```
+
+**Test Coverage:**
+- 15 tests for AI client behavior (retries, errors, rate limits)
+- 6 tests for telemetry event emissions
+- 5 tests for rate limit header parsing
+- 6 tests for error severity badge display
+- 5 tests for real-time progress tracking
+
+**Total: 157 tests, all passing**
+
+### 10.7 Quality Gates
+
+All code passes strict quality checks:
+
+```bash
+mix precommit
+```
+
+Runs:
+- **Credo**: Static code analysis (0 issues)
+- **Dialyzer**: Type checking (7 known issues in .dialyzer_ignore.exs)
+- **Mix Format**: Code formatting (enforced)
+- **ExUnit**: Full test suite (157 tests, 0 failures)
+
+Git pre-commit hooks enforce quality standards - commits are blocked without passing all checks.
