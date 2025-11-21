@@ -24,12 +24,40 @@ import {Socket} from "phoenix"
 import {LiveSocket} from "phoenix_live_view"
 import {hooks as colocatedHooks} from "phoenix-colocated/diagram_forge"
 import topbar from "../vendor/topbar"
+import mermaid from "mermaid"
+
+// Initialize Mermaid with dark theme
+mermaid.initialize({
+  startOnLoad: false,
+  theme: "dark",
+  securityLevel: "loose"
+})
+
+// Mermaid LiveView Hook
+const Mermaid = {
+  mounted() {
+    this.renderDiagram()
+  },
+  updated() {
+    this.renderDiagram()
+  },
+  renderDiagram() {
+    const diagram = this.el.querySelector(".mermaid")
+    if (diagram) {
+      // Clear previous diagram
+      diagram.removeAttribute("data-processed")
+      mermaid.run({
+        querySelector: ".mermaid"
+      })
+    }
+  }
+}
 
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
   params: {_csrf_token: csrfToken},
-  hooks: {...colocatedHooks},
+  hooks: {...colocatedHooks, Mermaid},
 })
 
 // Show progress bar on live navigation and form submits

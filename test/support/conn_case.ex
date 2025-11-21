@@ -28,6 +28,15 @@ defmodule DiagramForgeWeb.ConnCase do
       import Plug.Conn
       import Phoenix.ConnTest
       import DiagramForgeWeb.ConnCase
+
+      # Import fixtures
+      import DiagramForge.Fixtures
+
+      alias DiagramForge.Repo
+
+      import Ecto
+      import Ecto.Changeset
+      import Ecto.Query
     end
   end
 

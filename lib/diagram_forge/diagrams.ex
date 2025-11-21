@@ -32,6 +32,49 @@ defmodule DiagramForge.Diagrams do
   def get_document!(id), do: Repo.get!(Document, id)
 
   @doc """
+  Updates a document.
+
+  ## Examples
+
+      iex> update_document(document, %{title: "New Title"})
+      {:ok, %Document{}}
+
+  """
+  def update_document(%Document{} = document, attrs) do
+    document
+    |> Document.changeset(attrs)
+    |> Repo.update()
+    |> case do
+      {:ok, updated_doc} ->
+        Phoenix.PubSub.broadcast(
+          DiagramForge.PubSub,
+          "documents",
+          {:document_updated, updated_doc.id}
+        )
+
+        {:ok, updated_doc}
+
+      error ->
+        error
+    end
+  end
+
+  @doc """
+  Creates a document.
+
+  ## Examples
+
+      iex> create_document(%{title: "My Doc", source_type: :pdf, path: "/path/to/doc.pdf"})
+      {:ok, %Document{}}
+
+  """
+  def create_document(attrs \\ %{}) do
+    %Document{}
+    |> Document.changeset(attrs)
+    |> Repo.insert()
+  end
+
+  @doc """
   Creates a document and enqueues it for processing.
 
   ## Examples
@@ -96,6 +139,17 @@ defmodule DiagramForge.Diagrams do
   end
 
   @doc """
+  Lists diagrams for a given document.
+  """
+  def list_diagrams_for_document(document_id) do
+    Repo.all(
+      from d in Diagram,
+        where: d.document_id == ^document_id,
+        order_by: [desc: d.inserted_at]
+    )
+  end
+
+  @doc """
   Gets a single diagram.
   """
   def get_diagram!(id), do: Repo.get!(Diagram, id)
@@ -104,4 +158,23 @@ defmodule DiagramForge.Diagrams do
   Gets a diagram by slug.
   """
   def get_diagram_by_slug(slug), do: Repo.get_by(Diagram, slug: slug)
+
+  @doc """
+  Generates a diagram from a free-form text prompt.
+
+  ## Examples
+
+      iex> generate_diagram_from_prompt("Create a diagram about GenServer message handling", [])
+      {:ok, %Diagram{}}
+
+  ## Options
+
+    * `:ai_client` - AI client module to use (defaults to configured client)
+
+  """
+  def generate_diagram_from_prompt(prompt, opts) do
+    alias DiagramForge.Diagrams.DiagramGenerator
+
+    DiagramGenerator.generate_from_prompt(prompt, opts)
+  end
 end

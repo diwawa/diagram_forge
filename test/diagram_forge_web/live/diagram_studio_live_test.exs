@@ -1,0 +1,445 @@
+defmodule DiagramForgeWeb.DiagramStudioLiveTest do
+  use DiagramForgeWeb.ConnCase
+  use Oban.Testing, repo: DiagramForge.Repo
+
+  import Phoenix.LiveViewTest
+  import Mox
+
+  alias DiagramForge.Diagrams
+  alias DiagramForge.MockAIClient
+
+  setup :verify_on_exit!
+
+  describe "mount" do
+    test "initializes with empty state", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      assert view
+             |> element("#upload-form")
+             |> has_element?()
+
+      assert has_element?(view, "h1", "DiagramForge Studio")
+    end
+
+    test "loads existing documents", %{conn: conn} do
+      document = fixture(:document)
+
+      {:ok, view, html} = live(conn, ~p"/")
+
+      assert html =~ document.title
+      assert has_element?(view, "[phx-value-id='#{document.id}']")
+    end
+  end
+
+  describe "select_document" do
+    test "loads concepts and diagrams for selected document", %{conn: conn} do
+      document = fixture(:document)
+      concept = fixture(:concept, document_id: document.id)
+      diagram = fixture(:diagram, document_id: document.id, concept_id: concept.id)
+
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      # Select the document
+      view
+      |> element("[phx-value-id='#{document.id}']")
+      |> render_click()
+
+      html = render(view)
+
+      # Verify concepts are loaded
+      assert html =~ concept.name
+      assert html =~ concept.short_description
+
+      # Verify diagrams are loaded
+      assert html =~ diagram.title
+    end
+
+    test "clears selected concepts when switching documents", %{conn: conn} do
+      doc1 = fixture(:document, title: "Doc 1")
+      doc2 = fixture(:document, title: "Doc 2")
+      concept1 = fixture(:concept, document_id: doc1.id)
+      _concept2 = fixture(:concept, document_id: doc2.id)
+
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      # Select first document and toggle a concept
+      view
+      |> element("[phx-value-id='#{doc1.id}']")
+      |> render_click()
+
+      view
+      |> element("input[phx-value-id='#{concept1.id}']")
+      |> render_click()
+
+      # Verify concept is selected
+      assert view
+             |> element("input[phx-value-id='#{concept1.id}'][checked]")
+             |> has_element?()
+
+      # Switch to second document
+      view
+      |> element("[phx-value-id='#{doc2.id}']")
+      |> render_click()
+
+      # Verify selected concepts were cleared
+      refute view
+             |> element("input[checked]")
+             |> has_element?()
+    end
+  end
+
+  describe "toggle_concept" do
+    test "adds concept to selection", %{conn: conn} do
+      document = fixture(:document)
+      concept = fixture(:concept, document_id: document.id)
+
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      view
+      |> element("[phx-value-id='#{document.id}']")
+      |> render_click()
+
+      # Toggle concept on
+      view
+      |> element("input[phx-value-id='#{concept.id}']")
+      |> render_click()
+
+      # Verify checkbox is checked
+      assert view
+             |> element("input[phx-value-id='#{concept.id}'][checked]")
+             |> has_element?()
+
+      # Verify generate button shows count
+      assert has_element?(view, "button", "Generate (1)")
+    end
+
+    test "removes concept from selection when toggled again", %{conn: conn} do
+      document = fixture(:document)
+      concept = fixture(:concept, document_id: document.id)
+
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      view
+      |> element("[phx-value-id='#{document.id}']")
+      |> render_click()
+
+      # Toggle on
+      view
+      |> element("input[phx-value-id='#{concept.id}']")
+      |> render_click()
+
+      # Toggle off
+      view
+      |> element("input[phx-value-id='#{concept.id}']")
+      |> render_click()
+
+      # Verify checkbox is unchecked
+      refute view
+             |> element("input[phx-value-id='#{concept.id}'][checked]")
+             |> has_element?()
+
+      # Verify generate button with count is gone (button exists but not with count)
+      refute has_element?(view, "button", ~r/Generate \(\d+\)/)
+    end
+
+    test "supports multiple concept selection", %{conn: conn} do
+      document = fixture(:document)
+      concept1 = fixture(:concept, document_id: document.id, name: "Concept 1")
+      concept2 = fixture(:concept, document_id: document.id, name: "Concept 2")
+
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      view
+      |> element("[phx-value-id='#{document.id}']")
+      |> render_click()
+
+      # Select both concepts
+      view
+      |> element("input[phx-value-id='#{concept1.id}']")
+      |> render_click()
+
+      view
+      |> element("input[phx-value-id='#{concept2.id}']")
+      |> render_click()
+
+      # Verify both are selected
+      assert has_element?(view, "button", "Generate (2)")
+    end
+  end
+
+  describe "generate_diagrams" do
+    test "clears selection after clicking generate", %{conn: conn} do
+      document = fixture(:document)
+      concept1 = fixture(:concept, document_id: document.id)
+      concept2 = fixture(:concept, document_id: document.id)
+
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      view
+      |> element("[phx-value-id='#{document.id}']")
+      |> render_click()
+
+      # Select both concepts
+      view
+      |> element("input[phx-value-id='#{concept1.id}']")
+      |> render_click()
+
+      view
+      |> element("input[phx-value-id='#{concept2.id}']")
+      |> render_click()
+
+      # Verify both are selected before generation
+      assert has_element?(view, "button", "Generate (2)")
+
+      # Generate diagrams
+      view
+      |> element("button", "Generate (2)")
+      |> render_click()
+
+      # Verify jobs were enqueued
+      assert [%{args: %{"concept_id" => _}}, %{args: %{"concept_id" => _}}] =
+               all_enqueued(worker: DiagramForge.Diagrams.Workers.GenerateDiagramJob)
+
+      # Verify selection was cleared
+      refute view
+             |> element("input[checked]")
+             |> has_element?()
+
+      # Verify generate button with count is gone
+      refute has_element?(view, "button", ~r/Generate \(\d+\)/)
+    end
+  end
+
+  describe "select_diagram" do
+    test "displays selected diagram in preview area", %{conn: conn} do
+      document = fixture(:document)
+      concept = fixture(:concept, document_id: document.id)
+
+      diagram =
+        fixture(:diagram,
+          document_id: document.id,
+          concept_id: concept.id,
+          title: "Test Diagram",
+          diagram_source: "graph TD\nA-->B"
+        )
+
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      view
+      |> element("[phx-value-id='#{document.id}']")
+      |> render_click()
+
+      view
+      |> element("[phx-click='select_diagram'][phx-value-id='#{diagram.id}']")
+      |> render_click()
+
+      html = render(view)
+
+      # Verify diagram is displayed
+      assert html =~ "Test Diagram"
+      assert html =~ "graph TD"
+      assert html =~ "A--&gt;B"
+      assert has_element?(view, "#mermaid-preview")
+    end
+  end
+
+  describe "update_prompt" do
+    test "updates prompt assign", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      # Update prompt
+      view
+      |> element("textarea[name='prompt']")
+      |> render_change(%{"prompt" => "Create a GenServer diagram"})
+
+      # The prompt should be in the textarea value
+      assert view
+             |> element("textarea[name='prompt']")
+             |> render() =~ "Create a GenServer diagram"
+    end
+  end
+
+  describe "generate_from_prompt" do
+    test "generates diagram from prompt and displays it", %{conn: conn} do
+      ai_response = %{
+        "title" => "GenServer Flow",
+        "domain" => "elixir",
+        "level" => "intermediate",
+        "tags" => ["otp"],
+        "mermaid" => "flowchart TD\n  A[Start] --> B[GenServer]",
+        "summary" => "Shows GenServer flow",
+        "notes_md" => "# Notes\n\nTest notes"
+      }
+
+      expect(MockAIClient, :chat!, fn _messages, _opts ->
+        Jason.encode!(ai_response)
+      end)
+
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      # Update prompt
+      view
+      |> element("textarea[name='prompt']")
+      |> render_change(%{"prompt" => "Create a GenServer diagram"})
+
+      # Generate diagram - MockAIClient will be used automatically
+      view
+      |> element("form[phx-submit='generate_from_prompt']")
+      |> render_submit()
+
+      html = render(view)
+
+      # Verify diagram was created and is displayed
+      assert html =~ "GenServer Flow"
+      assert html =~ "Shows GenServer flow"
+
+      diagrams = Diagrams.list_diagrams()
+      assert length(diagrams) == 1
+      diagram = hd(diagrams)
+      assert diagram.title == "GenServer Flow"
+    end
+
+    test "does not create diagram when prompt is empty", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      # Try to submit with empty prompt
+      view
+      |> element("form[phx-submit='generate_from_prompt']")
+      |> render_submit()
+
+      # Verify no diagram was created
+      diagrams = Diagrams.list_diagrams()
+      assert diagrams == []
+    end
+
+    test "submit button is disabled when prompt is empty", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      # Verify submit button is disabled initially
+      assert view
+             |> element("button[type='submit'][disabled]", "Generate Diagram")
+             |> has_element?()
+    end
+  end
+
+  describe "handle_info - document_updated" do
+    test "refreshes document list when document is updated", %{conn: conn} do
+      document = fixture(:document, title: "Original Title")
+
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      # Verify original title
+      assert render(view) =~ "Original Title"
+
+      # Simulate document update via PubSub
+      {:ok, updated_doc} = Diagrams.update_document(document, %{title: "Updated Title"})
+
+      Phoenix.PubSub.broadcast(
+        DiagramForge.PubSub,
+        "documents",
+        {:document_updated, updated_doc.id}
+      )
+
+      # Give LiveView time to process the message
+      :timer.sleep(50)
+
+      # Verify updated title
+      assert render(view) =~ "Updated Title"
+      refute render(view) =~ "Original Title"
+    end
+
+    test "updates selected document when it is updated", %{conn: conn} do
+      document = fixture(:document, status: :uploaded)
+
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      # Select the document
+      view
+      |> element("[phx-value-id='#{document.id}']")
+      |> render_click()
+
+      # Update document status
+      {:ok, updated_doc} = Diagrams.update_document(document, %{status: :processing})
+
+      Phoenix.PubSub.broadcast(
+        DiagramForge.PubSub,
+        "documents",
+        {:document_updated, updated_doc.id}
+      )
+
+      :timer.sleep(50)
+
+      # Verify status badge shows processing
+      assert has_element?(view, "span", "processing")
+    end
+  end
+
+  describe "handle_info - diagram_created" do
+    test "refreshes diagrams when new diagram is created", %{conn: conn} do
+      document = fixture(:document)
+      concept = fixture(:concept, document_id: document.id)
+
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      # Select document
+      view
+      |> element("[phx-value-id='#{document.id}']")
+      |> render_click()
+
+      # Create a new diagram
+      diagram = fixture(:diagram, document_id: document.id, concept_id: concept.id)
+
+      # Broadcast diagram creation
+      Phoenix.PubSub.broadcast(
+        DiagramForge.PubSub,
+        "diagrams",
+        {:diagram_created, diagram.id}
+      )
+
+      :timer.sleep(50)
+
+      # Verify diagram appears in the list
+      assert render(view) =~ diagram.title
+    end
+
+    test "ignores diagram creation when no document is selected", %{conn: conn} do
+      document = fixture(:document)
+      concept = fixture(:concept, document_id: document.id)
+
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      # Don't select any document
+
+      # Create a diagram
+      diagram = fixture(:diagram, document_id: document.id, concept_id: concept.id)
+
+      # Broadcast diagram creation
+      Phoenix.PubSub.broadcast(
+        DiagramForge.PubSub,
+        "diagrams",
+        {:diagram_created, diagram.id}
+      )
+
+      :timer.sleep(50)
+
+      # Verify diagram doesn't appear (since no document is selected)
+      refute render(view) =~ diagram.title
+    end
+  end
+
+  describe "file upload" do
+    test "displays upload area and accepts files", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      # Verify upload area exists
+      assert has_element?(view, "#upload-form")
+      assert render(view) =~ "Click to upload or drag and drop"
+      assert render(view) =~ "PDF or Markdown"
+
+      # Verify upload button is disabled when no file is selected
+      assert view
+             |> element("button[type='submit'][disabled]")
+             |> has_element?()
+    end
+  end
+end

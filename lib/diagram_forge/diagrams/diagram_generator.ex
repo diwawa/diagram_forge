@@ -18,10 +18,10 @@ defmodule DiagramForge.Diagrams.DiagramGenerator do
 
   ## Options
 
-    * `:ai_client` - AI client module to use (defaults to DiagramForge.AI.Client)
+    * `:ai_client` - AI client module to use (defaults to configured client)
   """
-  def generate_for_concept(%Concept{} = concept, opts \\ []) do
-    ai_client = opts[:ai_client] || Client
+  def generate_for_concept(%Concept{} = concept, opts) do
+    ai_client = opts[:ai_client] || ai_client()
     concept = Repo.preload(concept, :document)
 
     context_excerpt = build_context_excerpt(concept.document)
@@ -64,10 +64,10 @@ defmodule DiagramForge.Diagrams.DiagramGenerator do
 
   ## Options
 
-    * `:ai_client` - AI client module to use (defaults to DiagramForge.AI.Client)
+    * `:ai_client` - AI client module to use (defaults to configured client)
   """
-  def generate_from_prompt(text, opts \\ []) do
-    ai_client = opts[:ai_client] || Client
+  def generate_from_prompt(text, opts) do
+    ai_client = opts[:ai_client] || ai_client()
     user_prompt = Prompts.diagram_from_prompt_user_prompt(text)
 
     json =
@@ -114,5 +114,9 @@ defmodule DiagramForge.Diagrams.DiagramGenerator do
     |> String.downcase()
     |> String.replace(~r/[^a-z0-9]+/, "-")
     |> String.trim("-")
+  end
+
+  defp ai_client do
+    Application.get_env(:diagram_forge, :ai_client, Client)
   end
 end

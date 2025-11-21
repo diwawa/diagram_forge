@@ -14,7 +14,9 @@ config :diagram_forge, DiagramForge.Repo,
   pool_size: System.schedulers_online() * 2
 
 # Disable Oban queues in test mode to prevent DB ownership errors
-config :diagram_forge, Oban, testing: :manual
+config :diagram_forge, Oban,
+  repo: DiagramForge.Repo,
+  testing: :manual
 
 # We don't run a server during test. If one is required,
 # you can enable the server option below.
@@ -38,3 +40,6 @@ config :phoenix, :plug_init_mode, :runtime
 # Enable helpful, but potentially expensive runtime checks
 config :phoenix_live_view,
   enable_expensive_runtime_checks: true
+
+# Use MockAIClient in tests
+config :diagram_forge, :ai_client, DiagramForge.MockAIClient

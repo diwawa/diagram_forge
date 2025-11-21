@@ -17,7 +17,8 @@ defmodule DiagramForgeWeb.Router do
   scope "/", DiagramForgeWeb do
     pipe_through :browser
 
-    get "/", PageController, :home
+    live "/", DiagramStudioLive
+    get "/home", PageController, :home
   end
 
   # Other scopes may use custom stacks.
