@@ -276,7 +276,85 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
         <div class="grid grid-cols-1 lg:grid-cols-4 gap-6 flex-1">
           <%!-- Left Sidebar --%>
           <div class="lg:col-span-1 space-y-4 flex flex-col">
-            <%!-- Concepts Section (Top) --%>
+            <%!-- Upload Section (Top) --%>
+            <div class="bg-slate-900 rounded-xl p-4">
+              <h2 class="text-lg font-semibold mb-3">Upload Document</h2>
+
+              <form phx-change="validate" phx-submit="save" id="upload-form">
+                <div class="space-y-3">
+                  <div
+                    class="border-2 border-dashed border-slate-700 rounded-lg p-4 text-center cursor-pointer hover:border-slate-600 transition"
+                    phx-drop-target={@uploads.document.ref}
+                  >
+                    <.live_file_input upload={@uploads.document} class="hidden" />
+                    <label for={@uploads.document.ref} class="cursor-pointer">
+                      <div class="text-slate-400">
+                        <p class="text-xs">Click or drag PDF/MD</p>
+                      </div>
+                    </label>
+                  </div>
+
+                  <%= for entry <- @uploads.document.entries do %>
+                    <div class="text-xs text-slate-300">
+                      {entry.client_name}
+                    </div>
+                  <% end %>
+
+                  <button
+                    type="submit"
+                    class="w-full px-3 py-2 text-sm bg-blue-600 hover:bg-blue-700 rounded transition"
+                    disabled={@uploads.document.entries == []}
+                  >
+                    Upload
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            <%!-- Documents Section --%>
+            <div class="bg-slate-900 rounded-xl p-4">
+              <h2 class="text-lg font-semibold mb-3">Documents</h2>
+
+              <div class="space-y-2 max-h-48 overflow-y-auto">
+                <%= for doc <- @documents do %>
+                  <div
+                    class={[
+                      "p-2 rounded cursor-pointer transition",
+                      @selected_document && @selected_document.id == doc.id &&
+                        "bg-slate-800 border border-slate-600",
+                      (!@selected_document || @selected_document.id != doc.id) &&
+                        "bg-slate-800/50 hover:bg-slate-800"
+                    ]}
+                    phx-click="select_document"
+                    phx-value-id={doc.id}
+                  >
+                    <div class="flex items-center justify-between mb-1">
+                      <span class="text-xs font-medium truncate">{doc.title}</span>
+                      <span class={[
+                        "text-xs px-1.5 py-0.5 rounded font-medium",
+                        doc.status == :ready && "bg-green-900/50 text-green-300",
+                        doc.status == :processing && "bg-yellow-900/50 text-yellow-300 animate-pulse",
+                        doc.status == :uploaded && "bg-blue-900/50 text-blue-300",
+                        doc.status == :error && "bg-red-900/50 text-red-300"
+                      ]}>
+                        {format_status(doc.status)}
+                      </span>
+                    </div>
+                    <%= if doc.status == :error and doc.error_message do %>
+                      <div class="text-xs text-red-400 mt-1">
+                        {doc.error_message}
+                      </div>
+                    <% end %>
+                  </div>
+                <% end %>
+
+                <%= if @documents == [] do %>
+                  <p class="text-xs text-slate-400 text-center py-4">No documents yet</p>
+                <% end %>
+              </div>
+            </div>
+
+            <%!-- Concepts Section (Bottom, scrollable) --%>
             <div class="bg-slate-900 rounded-xl p-4 flex-1 overflow-y-auto">
               <div class="flex items-center justify-between mb-4">
                 <h2 class="text-xl font-semibold">Concepts</h2>
@@ -403,84 +481,6 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
                   <p class="text-sm text-slate-400 text-center py-4">
                     Select a document to view concepts
                   </p>
-                <% end %>
-              </div>
-            </div>
-
-            <%!-- Upload Section (Bottom) --%>
-            <div class="bg-slate-900 rounded-xl p-4">
-              <h2 class="text-lg font-semibold mb-3">Upload Document</h2>
-
-              <form phx-change="validate" phx-submit="save" id="upload-form">
-                <div class="space-y-3">
-                  <div
-                    class="border-2 border-dashed border-slate-700 rounded-lg p-4 text-center cursor-pointer hover:border-slate-600 transition"
-                    phx-drop-target={@uploads.document.ref}
-                  >
-                    <.live_file_input upload={@uploads.document} class="hidden" />
-                    <label for={@uploads.document.ref} class="cursor-pointer">
-                      <div class="text-slate-400">
-                        <p class="text-xs">Click or drag PDF/MD</p>
-                      </div>
-                    </label>
-                  </div>
-
-                  <%= for entry <- @uploads.document.entries do %>
-                    <div class="text-xs text-slate-300">
-                      {entry.client_name}
-                    </div>
-                  <% end %>
-
-                  <button
-                    type="submit"
-                    class="w-full px-3 py-2 text-sm bg-blue-600 hover:bg-blue-700 rounded transition"
-                    disabled={@uploads.document.entries == []}
-                  >
-                    Upload
-                  </button>
-                </div>
-              </form>
-            </div>
-
-            <%!-- Documents Section (Bottom) --%>
-            <div class="bg-slate-900 rounded-xl p-4">
-              <h2 class="text-lg font-semibold mb-3">Documents</h2>
-
-              <div class="space-y-2 max-h-48 overflow-y-auto">
-                <%= for doc <- @documents do %>
-                  <div
-                    class={[
-                      "p-2 rounded cursor-pointer transition",
-                      @selected_document && @selected_document.id == doc.id &&
-                        "bg-slate-800 border border-slate-600",
-                      (!@selected_document || @selected_document.id != doc.id) &&
-                        "bg-slate-800/50 hover:bg-slate-800"
-                    ]}
-                    phx-click="select_document"
-                    phx-value-id={doc.id}
-                  >
-                    <div class="flex items-center justify-between mb-1">
-                      <span class="text-xs font-medium truncate">{doc.title}</span>
-                      <span class={[
-                        "text-xs px-1.5 py-0.5 rounded font-medium",
-                        doc.status == :ready && "bg-green-900/50 text-green-300",
-                        doc.status == :processing && "bg-yellow-900/50 text-yellow-300 animate-pulse",
-                        doc.status == :uploaded && "bg-blue-900/50 text-blue-300",
-                        doc.status == :error && "bg-red-900/50 text-red-300"
-                      ]}>
-                        {format_status(doc.status)}
-                      </span>
-                    </div>
-                    <%= if doc.status == :error and doc.error_message do %>
-                      <div class="text-xs text-red-400 mt-1">
-                        {doc.error_message}
-                      </div>
-                    <% end %>
-                  </div>
-                <% end %>
-
-                <%= if @documents == [] do %>
-                  <p class="text-xs text-slate-400 text-center py-4">No documents yet</p>
                 <% end %>
               </div>
             </div>
