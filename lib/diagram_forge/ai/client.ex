@@ -95,6 +95,9 @@ defmodule DiagramForge.AI.Client do
            ]
          ) do
       {:ok, %{status: status} = resp} when status >= 200 and status < 300 ->
+        # Parse and log rate limit headers
+        parse_rate_limit_headers(resp.headers)
+
         content =
           resp.body["choices"]
           |> List.first()
@@ -103,10 +106,109 @@ defmodule DiagramForge.AI.Client do
         {:ok, content}
 
       {:ok, %{status: status} = resp} ->
+        # Also parse rate limits on error responses
+        parse_rate_limit_headers(resp.headers)
+
         {:error, %{status: status, body: resp.body}}
 
       {:error, _reason} = error ->
         error
     end
+  end
+
+  defp parse_rate_limit_headers(headers) do
+    rate_limit_info = %{
+      requests_limit: get_header_value(headers, "x-ratelimit-limit-requests"),
+      requests_remaining: get_header_value(headers, "x-ratelimit-remaining-requests"),
+      requests_reset: get_header_value(headers, "x-ratelimit-reset-requests"),
+      tokens_limit: get_header_value(headers, "x-ratelimit-limit-tokens"),
+      tokens_remaining: get_header_value(headers, "x-ratelimit-remaining-tokens"),
+      tokens_reset: get_header_value(headers, "x-ratelimit-reset-tokens")
+    }
+
+    # Log warnings when approaching rate limits
+    check_rate_limit_threshold(rate_limit_info)
+
+    rate_limit_info
+  end
+
+  defp get_header_value(headers, key) when is_map(headers) do
+    case Map.get(headers, key) do
+      [value | _] when is_binary(value) -> parse_header_value(value)
+      value when is_binary(value) -> parse_header_value(value)
+      _ -> nil
+    end
+  end
+
+  defp parse_header_value(value) when is_binary(value) do
+    case Integer.parse(value) do
+      {int, _} -> int
+      :error -> value
+    end
+  end
+
+  defp check_rate_limit_threshold(rate_limit_info) do
+    # Check request rate limits
+    check_threshold(
+      rate_limit_info.requests_remaining,
+      rate_limit_info.requests_limit,
+      "requests",
+      rate_limit_info.requests_reset
+    )
+
+    # Check token rate limits
+    check_threshold(
+      rate_limit_info.tokens_remaining,
+      rate_limit_info.tokens_limit,
+      "tokens",
+      rate_limit_info.tokens_reset
+    )
+  end
+
+  defp check_threshold(nil, _limit, _type, _reset), do: :ok
+  defp check_threshold(_remaining, nil, _type, _reset), do: :ok
+
+  defp check_threshold(remaining, limit, type, reset)
+       when is_integer(remaining) and is_integer(limit) do
+    percentage = remaining / limit * 100
+
+    cond do
+      # Less than 10% remaining - critical warning
+      percentage < 10 ->
+        Logger.warning(
+          "OpenAI rate limit critical: #{type} - #{remaining}/#{limit} (#{Float.round(percentage, 1)}%), reset: #{format_reset_time(reset)}"
+        )
+
+      # Less than 25% remaining - warning
+      percentage < 25 ->
+        Logger.warning(
+          "OpenAI rate limit approaching: #{type} - #{remaining}/#{limit} (#{Float.round(percentage, 1)}%), reset: #{format_reset_time(reset)}"
+        )
+
+      # Log at debug level when above 25%
+      true ->
+        Logger.debug(
+          "OpenAI rate limit status: #{type} - #{remaining}/#{limit} (#{Float.round(percentage, 1)}%)"
+        )
+    end
+  end
+
+  defp check_threshold(_remaining, _limit, _type, _reset), do: :ok
+
+  defp format_reset_time(nil), do: "unknown"
+
+  defp format_reset_time(reset) when is_binary(reset) do
+    case DateTime.from_iso8601(reset) do
+      {:ok, dt, _offset} ->
+        seconds_until_reset = DateTime.diff(dt, DateTime.utc_now())
+        "#{seconds_until_reset}s"
+
+      {:error, _} ->
+        reset
+    end
+  end
+
+  defp format_reset_time(reset) when is_integer(reset) do
+    "#{reset}s"
   end
 end

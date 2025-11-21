@@ -313,4 +313,144 @@ defmodule DiagramForge.AI.ClientTest do
       end)
     end
   end
+
+  describe "rate limit header parsing" do
+    test "parses and logs rate limit headers from successful response", %{
+      bypass: bypass,
+      base_url: base_url
+    } do
+      messages = [%{"role" => "user", "content" => "Test"}]
+
+      Bypass.expect_once(bypass, "POST", "/chat/completions", fn conn ->
+        response = %{
+          "choices" => [
+            %{"message" => %{"content" => "{\"success\": true}"}}
+          ]
+        }
+
+        conn
+        |> Plug.Conn.put_resp_header("x-ratelimit-limit-requests", "500")
+        |> Plug.Conn.put_resp_header("x-ratelimit-remaining-requests", "450")
+        |> Plug.Conn.put_resp_header("x-ratelimit-reset-requests", "60")
+        |> Plug.Conn.put_resp_header("x-ratelimit-limit-tokens", "10000")
+        |> Plug.Conn.put_resp_header("x-ratelimit-remaining-tokens", "9500")
+        |> Plug.Conn.put_resp_header("x-ratelimit-reset-tokens", "60")
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.resp(200, Jason.encode!(response))
+      end)
+
+      # Above 25% threshold - should not log warnings (logs at debug level which won't show in tests)
+      result = Client.chat!(messages, base_url: base_url, max_attempts: 1)
+      assert result == "{\"success\": true}"
+    end
+
+    test "logs warning when approaching rate limit (below 25%)", %{
+      bypass: bypass,
+      base_url: base_url
+    } do
+      messages = [%{"role" => "user", "content" => "Test"}]
+
+      Bypass.expect_once(bypass, "POST", "/chat/completions", fn conn ->
+        response = %{
+          "choices" => [
+            %{"message" => %{"content" => "{\"success\": true}"}}
+          ]
+        }
+
+        conn
+        |> Plug.Conn.put_resp_header("x-ratelimit-limit-requests", "500")
+        |> Plug.Conn.put_resp_header("x-ratelimit-remaining-requests", "100")
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.resp(200, Jason.encode!(response))
+      end)
+
+      log =
+        capture_log(fn ->
+          Client.chat!(messages, base_url: base_url, max_attempts: 1)
+        end)
+
+      # Should log warning (100/500 = 20% remaining)
+      assert log =~ "OpenAI rate limit approaching"
+      assert log =~ "100/500"
+      assert log =~ "20.0%"
+    end
+
+    test "logs critical warning when rate limit critical (below 10%)", %{
+      bypass: bypass,
+      base_url: base_url
+    } do
+      messages = [%{"role" => "user", "content" => "Test"}]
+
+      Bypass.expect_once(bypass, "POST", "/chat/completions", fn conn ->
+        response = %{
+          "choices" => [
+            %{"message" => %{"content" => "{\"success\": true}"}}
+          ]
+        }
+
+        conn
+        |> Plug.Conn.put_resp_header("x-ratelimit-limit-requests", "500")
+        |> Plug.Conn.put_resp_header("x-ratelimit-remaining-requests", "25")
+        |> Plug.Conn.put_resp_header("x-ratelimit-reset-requests", "120")
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.resp(200, Jason.encode!(response))
+      end)
+
+      log =
+        capture_log(fn ->
+          Client.chat!(messages, base_url: base_url, max_attempts: 1)
+        end)
+
+      # Should log critical warning (25/500 = 5% remaining)
+      assert log =~ "OpenAI rate limit critical"
+      assert log =~ "25/500"
+      assert log =~ "5.0%"
+      assert log =~ "120s"
+    end
+
+    test "parses rate limit headers on error responses", %{bypass: bypass, base_url: base_url} do
+      messages = [%{"role" => "user", "content" => "Test"}]
+
+      Bypass.expect_once(bypass, "POST", "/chat/completions", fn conn ->
+        conn
+        |> Plug.Conn.put_resp_header("x-ratelimit-limit-requests", "500")
+        |> Plug.Conn.put_resp_header("x-ratelimit-remaining-requests", "0")
+        |> Plug.Conn.put_resp_header("x-ratelimit-reset-requests", "60")
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.resp(429, Jason.encode!(%{"error" => "Rate limit exceeded"}))
+      end)
+
+      log =
+        capture_log(fn ->
+          assert_raise RuntimeError, ~r/OpenAI API request failed/, fn ->
+            Client.chat!(messages, base_url: base_url, max_attempts: 1)
+          end
+        end)
+
+      # Should log critical warning (0/500 = 0% remaining)
+      assert log =~ "OpenAI rate limit critical"
+      assert log =~ "0/500"
+    end
+
+    test "handles missing rate limit headers gracefully", %{bypass: bypass, base_url: base_url} do
+      messages = [%{"role" => "user", "content" => "Test"}]
+
+      Bypass.expect_once(bypass, "POST", "/chat/completions", fn conn ->
+        response = %{
+          "choices" => [
+            %{"message" => %{"content" => "{\"success\": true}"}}
+          ]
+        }
+
+        # No rate limit headers
+        conn
+        |> Plug.Conn.put_resp_content_type("application/json")
+        |> Plug.Conn.resp(200, Jason.encode!(response))
+      end)
+
+      # Should not crash when headers are missing
+      result = Client.chat!(messages, base_url: base_url, max_attempts: 1)
+      assert result == "{\"success\": true}"
+    end
+  end
 end
