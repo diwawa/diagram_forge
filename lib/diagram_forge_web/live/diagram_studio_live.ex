@@ -30,6 +30,7 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
      |> assign(:selected_diagram, nil)
      |> assign(:prompt, "")
      |> assign(:uploaded_files, [])
+     |> assign(:generating, false)
      |> allow_upload(:document,
        accept: ~w(.pdf .md .markdown),
        max_entries: 1,
@@ -104,6 +105,8 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
     if prompt == "" do
       {:noreply, put_flash(socket, :error, "Please enter a prompt")}
     else
+      socket = assign(socket, :generating, true)
+
       case Diagrams.generate_diagram_from_prompt(prompt, []) do
         {:ok, diagram} ->
           {:noreply,
@@ -111,10 +114,14 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
            |> assign(:selected_diagram, diagram)
            |> assign(:diagrams, [diagram | socket.assigns.diagrams])
            |> assign(:prompt, "")
+           |> assign(:generating, false)
            |> put_flash(:info, "Diagram generated!")}
 
         {:error, reason} ->
-          {:noreply, put_flash(socket, :error, "Failed to generate diagram: #{reason}")}
+          {:noreply,
+           socket
+           |> assign(:generating, false)
+           |> put_flash(:error, "Failed to generate diagram: #{inspect(reason)}")}
       end
     end
   end
@@ -241,18 +248,23 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
                     phx-click="select_document"
                     phx-value-id={doc.id}
                   >
-                    <div class="flex items-center justify-between">
+                    <div class="flex items-center justify-between mb-1">
                       <span class="text-sm font-medium truncate">{doc.title}</span>
                       <span class={[
-                        "text-xs px-2 py-1 rounded",
+                        "text-xs px-2 py-1 rounded font-medium",
                         doc.status == :ready && "bg-green-900/50 text-green-300",
-                        doc.status == :processing && "bg-yellow-900/50 text-yellow-300",
+                        doc.status == :processing && "bg-yellow-900/50 text-yellow-300 animate-pulse",
                         doc.status == :uploaded && "bg-blue-900/50 text-blue-300",
                         doc.status == :error && "bg-red-900/50 text-red-300"
                       ]}>
-                        {doc.status}
+                        {format_status(doc.status)}
                       </span>
                     </div>
+                    <%= if doc.status == :error and doc.error_message do %>
+                      <div class="text-xs text-red-400 mt-2">
+                        Error: {doc.error_message}
+                      </div>
+                    <% end %>
                   </div>
                 <% end %>
 
@@ -386,14 +398,45 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
                   placeholder="e.g., Create a diagram showing how GenServer handles messages"
                   class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded focus:border-slate-600 focus:outline-none resize-y"
                   rows="4"
+                  disabled={@generating}
                 />
 
                 <button
                   type="submit"
-                  class="w-full px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded transition"
-                  disabled={String.trim(@prompt) == ""}
+                  class={[
+                    "w-full px-4 py-2 rounded transition flex items-center justify-center gap-2",
+                    @generating && "bg-purple-800 cursor-wait",
+                    !@generating && "bg-purple-600 hover:bg-purple-700"
+                  ]}
+                  disabled={String.trim(@prompt) == "" or @generating}
                 >
-                  Generate Diagram
+                  <%= if @generating do %>
+                    <svg
+                      class="animate-spin h-5 w-5"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        class="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        stroke-width="4"
+                      >
+                      </circle>
+                      <path
+                        class="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      >
+                      </path>
+                    </svg>
+                    <span>Generating...</span>
+                  <% else %>
+                    <span>Generate Diagram</span>
+                  <% end %>
                 </button>
               </form>
             </div>
@@ -418,6 +461,16 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
       |> assign(:concepts, concepts)
     else
       socket
+    end
+  end
+
+  defp format_status(status) do
+    case status do
+      :uploaded -> "Uploaded"
+      :processing -> "Processing..."
+      :ready -> "Ready"
+      :error -> "Error"
+      _ -> to_string(status)
     end
   end
 end

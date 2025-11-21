@@ -1,6 +1,8 @@
 defmodule DiagramForge.ErrorHandling.RetryTest do
   use ExUnit.Case, async: true
 
+  import ExUnit.CaptureLog
+
   alias DiagramForge.ErrorHandling.Retry
 
   describe "calculate_delay/3" do
@@ -51,15 +53,19 @@ defmodule DiagramForge.ErrorHandling.RetryTest do
       end
 
       # Should retry once and succeed
-      assert {:ok, "success"} =
-               Retry.with_retry(func, base_delay_ms: 10, max_delay_ms: 100)
+      capture_log(fn ->
+        assert {:ok, "success"} =
+                 Retry.with_retry(func, base_delay_ms: 10, max_delay_ms: 100)
+      end)
     end
 
     test "returns original error after max retries exceeded" do
       func = fn -> {:error, %{status: 503}} end
 
-      assert {:error, %{status: 503}} =
-               Retry.with_retry(func, max_attempts: 2, base_delay_ms: 10, max_delay_ms: 100)
+      capture_log(fn ->
+        assert {:error, %{status: 503}} =
+                 Retry.with_retry(func, max_attempts: 2, base_delay_ms: 10, max_delay_ms: 100)
+      end)
     end
 
     test "calls on_retry callback on each retry" do
@@ -71,12 +77,14 @@ defmodule DiagramForge.ErrorHandling.RetryTest do
         send(test_pid, {:retry, attempt})
       end
 
-      Retry.with_retry(func,
-        max_attempts: 3,
-        base_delay_ms: 10,
-        max_delay_ms: 100,
-        on_retry: on_retry
-      )
+      capture_log(fn ->
+        Retry.with_retry(func,
+          max_attempts: 3,
+          base_delay_ms: 10,
+          max_delay_ms: 100,
+          on_retry: on_retry
+        )
+      end)
 
       # Should have received 2 retry callbacks (attempt 1 fails, retry on 2, retry on 3)
       assert_received {:retry, 1}
@@ -90,13 +98,15 @@ defmodule DiagramForge.ErrorHandling.RetryTest do
       # Custom predicate that always says retry
       retry_if = fn _error -> true end
 
-      assert {:error, :custom_error} =
-               Retry.with_retry(func,
-                 max_attempts: 2,
-                 base_delay_ms: 10,
-                 max_delay_ms: 100,
-                 retry_if: retry_if
-               )
+      capture_log(fn ->
+        assert {:error, :custom_error} =
+                 Retry.with_retry(func,
+                   max_attempts: 2,
+                   base_delay_ms: 10,
+                   max_delay_ms: 100,
+                   retry_if: retry_if
+                 )
+      end)
     end
 
     test "handles non-tuple return values" do
@@ -113,7 +123,9 @@ defmodule DiagramForge.ErrorHandling.RetryTest do
         {:error, %{status: 503}}
       end
 
-      Retry.with_retry(func, max_attempts: 5, base_delay_ms: 10, max_delay_ms: 100)
+      capture_log(fn ->
+        Retry.with_retry(func, max_attempts: 5, base_delay_ms: 10, max_delay_ms: 100)
+      end)
 
       # Should have tried 5 times total
       assert Agent.get(agent, & &1) == 5

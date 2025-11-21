@@ -370,7 +370,7 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
       :timer.sleep(50)
 
       # Verify status badge shows processing
-      assert has_element?(view, "span", "processing")
+      assert has_element?(view, "span", "Processing...")
     end
   end
 
