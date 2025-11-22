@@ -90,9 +90,14 @@ defmodule DiagramForge.Diagrams.DiagramGenerator do
       notes_md: json["notes_md"]
     }
 
-    %Diagram{}
-    |> Diagram.changeset(attrs)
-    |> Repo.insert()
+    changeset = Diagram.changeset(%Diagram{}, attrs)
+
+    if changeset.valid? do
+      diagram = Ecto.Changeset.apply_changes(changeset)
+      {:ok, diagram}
+    else
+      {:error, changeset}
+    end
   end
 
   defp build_context_excerpt(%Document{raw_text: nil}), do: ""

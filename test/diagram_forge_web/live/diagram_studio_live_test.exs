@@ -302,10 +302,22 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
 
       html = render(view)
 
-      # Verify diagram was created and is displayed
+      # Verify diagram was generated and is displayed
       assert html =~ "GenServer Flow"
       assert html =~ "Shows GenServer flow"
+      assert html =~ "💾 Save Diagram"
+      assert html =~ "🗑️ Discard"
 
+      # Diagram should NOT be in database yet (needs to be saved)
+      diagrams = Diagrams.list_diagrams()
+      assert diagrams == []
+
+      # Click Save button
+      view
+      |> element("button", "💾 Save Diagram")
+      |> render_click()
+
+      # Now diagram should be in database
       diagrams = Diagrams.list_diagrams()
       assert length(diagrams) == 1
       diagram = hd(diagrams)

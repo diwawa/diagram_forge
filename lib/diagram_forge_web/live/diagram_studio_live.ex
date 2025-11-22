@@ -23,12 +23,16 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
      socket
      |> assign(:documents, list_documents())
      |> assign(:selected_document, nil)
-     |> assign(:concepts, [])
+     |> assign(:concepts_page, 1)
+     |> assign(:concepts_page_size, 20)
+     |> assign(:concepts_total, count_concepts())
+     |> assign(:concepts, list_concepts(page: 1, page_size: 20))
      |> assign(:category_filter, nil)
      |> assign(:selected_concepts, MapSet.new())
      |> assign(:expanded_concepts, MapSet.new())
      |> assign(:diagrams, [])
      |> assign(:selected_diagram, nil)
+     |> assign(:generated_diagram, nil)
      |> assign(:prompt, "")
      |> assign(:uploaded_files, [])
      |> assign(:generating, false)
@@ -46,7 +50,6 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
   @impl true
   def handle_event("select_document", %{"id" => id}, socket) do
     document = Diagrams.get_document!(id)
-    concepts = Diagrams.list_concepts_for_document(document.id)
     diagrams = Diagrams.list_diagrams_for_document(document.id)
 
     # Subscribe to generation progress for this document
@@ -57,10 +60,10 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
     {:noreply,
      socket
      |> assign(:selected_document, document)
-     |> assign(:concepts, concepts)
      |> assign(:diagrams, diagrams)
      |> assign(:selected_concepts, MapSet.new())
      |> assign(:selected_diagram, nil)
+     |> assign(:generated_diagram, nil)
      |> assign(:generating_concepts, MapSet.new())
      |> assign(:generation_total, 0)
      |> assign(:generation_completed, 0)
@@ -132,7 +135,10 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
   def handle_event("select_diagram", %{"id" => id}, socket) do
     diagram = Diagrams.get_diagram!(id)
 
-    {:noreply, assign(socket, :selected_diagram, diagram)}
+    {:noreply,
+     socket
+     |> assign(:selected_diagram, diagram)
+     |> assign(:generated_diagram, nil)}
   end
 
   @impl true
@@ -154,10 +160,10 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
           {:noreply,
            socket
            |> assign(:selected_diagram, diagram)
-           |> assign(:diagrams, [diagram | socket.assigns.diagrams])
+           |> assign(:generated_diagram, diagram)
            |> assign(:prompt, "")
            |> assign(:generating, false)
-           |> put_flash(:info, "Diagram generated!")}
+           |> put_flash(:info, "Diagram generated! Click Save to persist it.")}
 
         {:error, reason} ->
           {:noreply,
@@ -166,6 +172,65 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
            |> put_flash(:error, "Failed to generate diagram: #{inspect(reason)}")}
       end
     end
+  end
+
+  @impl true
+  def handle_event("save_generated_diagram", _params, socket) do
+    case socket.assigns.generated_diagram do
+      nil ->
+        {:noreply, put_flash(socket, :error, "No diagram to save")}
+
+      diagram ->
+        case Diagrams.save_generated_diagram(diagram) do
+          {:ok, saved_diagram} ->
+            {:noreply,
+             socket
+             |> assign(:generated_diagram, nil)
+             |> assign(:selected_diagram, saved_diagram)
+             |> assign(:diagrams, [saved_diagram | socket.assigns.diagrams])
+             |> put_flash(:info, "Diagram saved successfully!")}
+
+          {:error, _changeset} ->
+            {:noreply, put_flash(socket, :error, "Failed to save diagram")}
+        end
+    end
+  end
+
+  @impl true
+  def handle_event("discard_generated_diagram", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:generated_diagram, nil)
+     |> assign(:selected_diagram, nil)
+     |> put_flash(:info, "Diagram discarded")}
+  end
+
+  @impl true
+  def handle_event("concepts_change_page", %{"page" => page}, socket) do
+    page = String.to_integer(page)
+    page_size = socket.assigns.concepts_page_size
+
+    concepts = list_concepts(page: page, page_size: page_size)
+
+    {:noreply,
+     socket
+     |> assign(:concepts_page, page)
+     |> assign(:concepts, concepts)}
+  end
+
+  @impl true
+  def handle_event("concepts_change_page_size", %{"page_size" => page_size}, socket) do
+    page_size = String.to_integer(page_size)
+    # Reset to page 1 when changing page size
+    page = 1
+
+    concepts = list_concepts(page: page, page_size: page_size)
+
+    {:noreply,
+     socket
+     |> assign(:concepts_page, page)
+     |> assign(:concepts_page_size, page_size)
+     |> assign(:concepts, concepts)}
   end
 
   @impl true
@@ -380,9 +445,62 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
                 <% end %>
               </div>
 
+              <%!-- Pagination Controls --%>
+              <% total_pages = ceil(@concepts_total / @concepts_page_size) %>
+              <div class="flex items-center justify-between mb-3 pb-3 border-b border-slate-800 text-xs">
+                <div class="flex items-center gap-2">
+                  <span class="text-slate-400">Page size:</span>
+                  <select
+                    phx-change="concepts_change_page_size"
+                    name="page_size"
+                    class="bg-slate-800 text-slate-300 rounded px-2 py-1"
+                  >
+                    <%= for size <- [10, 20, 50, 100] do %>
+                      <option value={size} selected={@concepts_page_size == size}>
+                        {size}
+                      </option>
+                    <% end %>
+                  </select>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class="text-slate-400">
+                    Page {@concepts_page} of {total_pages} ({@concepts_total} total)
+                  </span>
+                  <div class="flex gap-1">
+                    <button
+                      phx-click="concepts_change_page"
+                      phx-value-page={@concepts_page - 1}
+                      disabled={@concepts_page == 1}
+                      class={[
+                        "px-2 py-1 rounded transition",
+                        @concepts_page == 1 &&
+                          "bg-slate-800 text-slate-600 cursor-not-allowed",
+                        @concepts_page > 1 && "bg-slate-700 hover:bg-slate-600 text-slate-300"
+                      ]}
+                    >
+                      ←
+                    </button>
+                    <button
+                      phx-click="concepts_change_page"
+                      phx-value-page={@concepts_page + 1}
+                      disabled={@concepts_page >= total_pages}
+                      class={[
+                        "px-2 py-1 rounded transition",
+                        @concepts_page >= total_pages &&
+                          "bg-slate-800 text-slate-600 cursor-not-allowed",
+                        @concepts_page < total_pages &&
+                          "bg-slate-700 hover:bg-slate-600 text-slate-300"
+                      ]}
+                    >
+                      →
+                    </button>
+                  </div>
+                </div>
+              </div>
+
               <%!-- Category Filter Tags --%>
-              <%= if @selected_document do %>
-                <% categories = @concepts |> Enum.map(& &1.category) |> Enum.uniq() |> Enum.sort() %>
+              <% categories = @concepts |> Enum.map(& &1.category) |> Enum.uniq() |> Enum.sort() %>
+              <%= if categories != [] do %>
                 <div class="flex flex-wrap gap-2 mb-3 pb-3 border-b border-slate-800">
                   <span class="text-xs text-slate-400 self-center">Filter:</span>
                   <%= for category <- categories do %>
@@ -431,101 +549,91 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
 
               <%!-- Scrollable Concepts List --%>
               <div class="overflow-y-auto space-y-1 max-h-[800px]">
-                <%= if @selected_document do %>
-                  <% filtered_concepts =
-                    if @category_filter,
-                      do: Enum.filter(@concepts, &(&1.category == @category_filter)),
-                      else: @concepts %>
-                  <%= for concept <- filtered_concepts do %>
-                    <% concept_diagrams = diagrams_for_concept(@diagrams, concept.id) %>
-                    <% is_expanded = MapSet.member?(@expanded_concepts, concept.id) %>
+                <% filtered_concepts =
+                  if @category_filter,
+                    do: Enum.filter(@concepts, &(&1.category == @category_filter)),
+                    else: @concepts %>
+                <%= for concept <- filtered_concepts do %>
+                  <% concept_diagrams = diagrams_for_concept(@diagrams, concept.id) %>
+                  <% is_expanded = MapSet.member?(@expanded_concepts, concept.id) %>
 
-                    <div class="border border-slate-800 rounded-lg overflow-hidden">
-                      <%!-- Concept Header --%>
-                      <div
-                        class="p-2 bg-slate-800/50 hover:bg-slate-800 cursor-pointer flex items-center gap-2"
-                        phx-click="toggle_concept_expand"
-                        phx-value-id={concept.id}
-                      >
-                        <span class="text-slate-400">
-                          {if is_expanded, do: "▼", else: "▶"}
-                        </span>
-                        <div class="flex-1">
-                          <div class="font-medium text-sm">{concept.name}</div>
-                          <div class="flex gap-1 mt-1">
-                            <span class="text-xs px-1.5 py-0.5 bg-slate-700 rounded">
-                              {concept.category}
-                            </span>
-                            <%= if length(concept_diagrams) > 0 do %>
-                              <span class="text-xs px-1.5 py-0.5 bg-blue-900/50 text-blue-300 rounded">
-                                {length(concept_diagrams)} diagrams
-                              </span>
-                            <% end %>
-                            <%= if Map.has_key?(@failed_generations, concept.id) do %>
-                              <% error = @failed_generations[concept.id] %>
-                              <span class={[
-                                "text-xs px-1.5 py-0.5 rounded font-semibold",
-                                error.severity == :critical && "bg-red-900/50 text-red-300",
-                                error.severity == :high && "bg-orange-900/50 text-orange-300",
-                                error.severity == :medium && "bg-yellow-900/50 text-yellow-300",
-                                error.severity == :low && "bg-blue-900/50 text-blue-300"
-                              ]}>
-                                ⚠
-                              </span>
-                            <% end %>
-                          </div>
-                        </div>
-                      </div>
-
-                      <%!-- Diagrams List (Expandable) --%>
-                      <%= if is_expanded do %>
-                        <div class="bg-slate-900/30">
+                  <div class="border border-slate-800 rounded-lg overflow-hidden">
+                    <%!-- Concept Header --%>
+                    <div
+                      class="p-2 bg-slate-800/50 hover:bg-slate-800 cursor-pointer flex items-center gap-2"
+                      phx-click="toggle_concept_expand"
+                      phx-value-id={concept.id}
+                    >
+                      <span class="text-slate-400">
+                        {if is_expanded, do: "▼", else: "▶"}
+                      </span>
+                      <div class="flex-1">
+                        <div class="font-medium text-sm">{concept.name}</div>
+                        <div class="flex gap-1 mt-1">
+                          <span class="text-xs px-1.5 py-0.5 bg-slate-700 rounded">
+                            {concept.category}
+                          </span>
                           <%= if length(concept_diagrams) > 0 do %>
-                            <%= for diagram <- concept_diagrams do %>
-                              <div
-                                class={[
-                                  "pl-8 pr-2 py-2 text-sm cursor-pointer transition border-l-2",
-                                  @selected_diagram && @selected_diagram.id == diagram.id &&
-                                    "bg-blue-900/30 border-blue-500 text-blue-200",
-                                  (!@selected_diagram || @selected_diagram.id != diagram.id) &&
-                                    "border-transparent hover:bg-slate-800/50"
-                                ]}
-                                phx-click="select_diagram"
-                                phx-value-id={diagram.id}
-                              >
-                                → {diagram.title}
-                              </div>
-                            <% end %>
-                          <% else %>
-                            <div class="pl-8 pr-2 py-2 text-sm text-slate-500">
-                              <label class="flex items-center gap-2 cursor-pointer">
-                                <input
-                                  type="checkbox"
-                                  checked={MapSet.member?(@selected_concepts, concept.id)}
-                                  phx-click="toggle_concept"
-                                  phx-value-id={concept.id}
-                                />
-                                <span>Select to generate</span>
-                              </label>
-                            </div>
+                            <span class="text-xs px-1.5 py-0.5 bg-blue-900/50 text-blue-300 rounded">
+                              {length(concept_diagrams)} diagrams
+                            </span>
+                          <% end %>
+                          <%= if Map.has_key?(@failed_generations, concept.id) do %>
+                            <% error = @failed_generations[concept.id] %>
+                            <span class={[
+                              "text-xs px-1.5 py-0.5 rounded font-semibold",
+                              error.severity == :critical && "bg-red-900/50 text-red-300",
+                              error.severity == :high && "bg-orange-900/50 text-orange-300",
+                              error.severity == :medium && "bg-yellow-900/50 text-yellow-300",
+                              error.severity == :low && "bg-blue-900/50 text-blue-300"
+                            ]}>
+                              ⚠
+                            </span>
                           <% end %>
                         </div>
-                      <% end %>
+                      </div>
                     </div>
-                  <% end %>
 
-                  <%= if @concepts == [] do %>
-                    <p class="text-sm text-slate-400 text-center py-4">
-                      <%= if @selected_document.status == :processing do %>
-                        Processing document...
-                      <% else %>
-                        No concepts extracted yet
-                      <% end %>
-                    </p>
-                  <% end %>
-                <% else %>
+                    <%!-- Diagrams List (Expandable) --%>
+                    <%= if is_expanded do %>
+                      <div class="bg-slate-900/30">
+                        <%= if length(concept_diagrams) > 0 do %>
+                          <%= for diagram <- concept_diagrams do %>
+                            <div
+                              class={[
+                                "pl-8 pr-2 py-2 text-sm cursor-pointer transition border-l-2",
+                                @selected_diagram && @selected_diagram.id == diagram.id &&
+                                  "bg-blue-900/30 border-blue-500 text-blue-200",
+                                (!@selected_diagram || @selected_diagram.id != diagram.id) &&
+                                  "border-transparent hover:bg-slate-800/50"
+                              ]}
+                              phx-click="select_diagram"
+                              phx-value-id={diagram.id}
+                            >
+                              → {diagram.title}
+                            </div>
+                          <% end %>
+                        <% else %>
+                          <div class="pl-8 pr-2 py-2 text-sm text-slate-500">
+                            <label class="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={MapSet.member?(@selected_concepts, concept.id)}
+                                phx-click="toggle_concept"
+                                phx-value-id={concept.id}
+                              />
+                              <span>Select to generate</span>
+                            </label>
+                          </div>
+                        <% end %>
+                      </div>
+                    <% end %>
+                  </div>
+                <% end %>
+
+                <%= if @concepts == [] do %>
                   <p class="text-sm text-slate-400 text-center py-4">
-                    Select a document to view concepts
+                    No concepts extracted yet. Upload a document to get started.
                   </p>
                 <% end %>
               </div>
@@ -580,6 +688,24 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
                       <% end %>
                     </div>
                   </div>
+
+                  <%!-- Save/Discard buttons for generated diagrams --%>
+                  <%= if @generated_diagram do %>
+                    <div class="flex gap-3 p-4 bg-blue-900/20 border border-blue-700/50 rounded-lg">
+                      <button
+                        phx-click="save_generated_diagram"
+                        class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors flex-1"
+                      >
+                        💾 Save Diagram
+                      </button>
+                      <button
+                        phx-click="discard_generated_diagram"
+                        class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-medium transition-colors flex-1"
+                      >
+                        🗑️ Discard
+                      </button>
+                    </div>
+                  <% end %>
 
                   <div
                     id="mermaid-preview"
@@ -678,14 +804,30 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
     Diagrams.list_documents()
   end
 
+  defp list_concepts(opts) do
+    Diagrams.list_concepts(opts)
+  end
+
+  defp count_concepts do
+    Diagrams.count_concepts()
+  end
+
   defp maybe_update_selected_document(socket, document_id) do
     if socket.assigns.selected_document && socket.assigns.selected_document.id == document_id do
       document = Diagrams.get_document!(document_id)
-      concepts = Diagrams.list_concepts_for_document(document.id)
+      # Reload all concepts since new concepts may have been added, using current pagination
+      concepts =
+        list_concepts(
+          page: socket.assigns.concepts_page,
+          page_size: socket.assigns.concepts_page_size
+        )
+
+      concepts_total = count_concepts()
 
       socket
       |> assign(:selected_document, document)
       |> assign(:concepts, concepts)
+      |> assign(:concepts_total, concepts_total)
     else
       socket
     end

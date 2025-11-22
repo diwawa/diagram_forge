@@ -103,6 +103,42 @@ defmodule DiagramForge.Diagrams do
   # Concepts
 
   @doc """
+  Lists all concepts with pagination.
+
+  ## Options
+
+    * `:page` - Page number (default: 1)
+    * `:page_size` - Number of concepts per page (default: 20)
+
+  ## Examples
+
+      iex> list_concepts(page: 1, page_size: 20)
+      [%Concept{}, ...]
+
+      iex> list_concepts(page: 2, page_size: 50)
+      [%Concept{}, ...]
+  """
+  def list_concepts(opts \\ []) do
+    page = Keyword.get(opts, :page, 1)
+    page_size = Keyword.get(opts, :page_size, 20)
+    offset = (page - 1) * page_size
+
+    Repo.all(
+      from c in Concept,
+        order_by: [asc: c.name],
+        limit: ^page_size,
+        offset: ^offset
+    )
+  end
+
+  @doc """
+  Counts total number of concepts.
+  """
+  def count_concepts do
+    Repo.aggregate(Concept, :count)
+  end
+
+  @doc """
   Lists concepts for a given document.
   """
   def list_concepts_for_document(document_id) do
@@ -158,6 +194,24 @@ defmodule DiagramForge.Diagrams do
   Gets a diagram by slug.
   """
   def get_diagram_by_slug(slug), do: Repo.get_by(Diagram, slug: slug)
+
+  @doc """
+  Saves a generated diagram to the database.
+
+  Takes an unsaved diagram struct (typically from `generate_diagram_from_prompt/2`)
+  and persists it to the database.
+
+  ## Examples
+
+      iex> {:ok, unsaved_diagram} = generate_diagram_from_prompt("...", [])
+      iex> save_generated_diagram(unsaved_diagram)
+      {:ok, %Diagram{id: 123, ...}}
+  """
+  def save_generated_diagram(%Diagram{} = diagram) do
+    diagram
+    |> Diagram.changeset(%{})
+    |> Repo.insert()
+  end
 
   @doc """
   Generates a diagram from a free-form text prompt.
