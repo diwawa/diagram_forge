@@ -24,6 +24,7 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
      |> assign(:documents, list_documents())
      |> assign(:selected_document, nil)
      |> assign(:concepts, [])
+     |> assign(:category_filter, nil)
      |> assign(:selected_concepts, MapSet.new())
      |> assign(:expanded_concepts, MapSet.new())
      |> assign(:diagrams, [])
@@ -94,6 +95,12 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
       end
 
     {:noreply, assign(socket, :expanded_concepts, expanded)}
+  end
+
+  @impl true
+  def handle_event("filter_category", %{"category" => category}, socket) do
+    new_filter = if socket.assigns.category_filter == category, do: nil, else: category
+    {:noreply, assign(socket, :category_filter, new_filter)}
   end
 
   @impl true
@@ -270,12 +277,17 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
   def render(assigns) do
     ~H"""
     <div class="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
-      <div class="container mx-auto px-4 py-8 flex-1 flex flex-col">
-        <h1 class="text-4xl font-bold mb-8 text-center">DiagramForge Studio</h1>
+      <%!-- Top Navbar --%>
+      <div class="bg-slate-900 border-b border-slate-800">
+        <div class="container mx-auto px-4 py-3">
+          <h1 class="text-xl font-bold text-slate-100">DiagramForge Studio</h1>
+        </div>
+      </div>
 
+      <div class="container mx-auto px-4 py-4 flex-1 flex flex-col">
         <div class="grid grid-cols-1 lg:grid-cols-4 gap-6 flex-1">
           <%!-- Left Sidebar --%>
-          <div class="lg:col-span-1 space-y-4 flex flex-col">
+          <div class="lg:col-span-1 flex flex-col gap-4">
             <%!-- Upload Section (Top) --%>
             <div class="bg-slate-900 rounded-xl p-4">
               <h2 class="text-lg font-semibold mb-3">Upload Document</h2>
@@ -355,8 +367,8 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
             </div>
 
             <%!-- Concepts Section (Bottom, scrollable) --%>
-            <div class="bg-slate-900 rounded-xl p-4 flex-1 overflow-y-auto">
-              <div class="flex items-center justify-between mb-4">
+            <div class="bg-slate-900 rounded-xl p-4 flex flex-col overflow-hidden">
+              <div class="flex items-center justify-between mb-3">
                 <h2 class="text-xl font-semibold">Concepts</h2>
                 <%= if MapSet.size(@selected_concepts) > 0 do %>
                   <button
@@ -367,6 +379,38 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
                   </button>
                 <% end %>
               </div>
+
+              <%!-- Category Filter Tags --%>
+              <%= if @selected_document do %>
+                <% categories = @concepts |> Enum.map(& &1.category) |> Enum.uniq() |> Enum.sort() %>
+                <div class="flex flex-wrap gap-2 mb-3 pb-3 border-b border-slate-800">
+                  <span class="text-xs text-slate-400 self-center">Filter:</span>
+                  <%= for category <- categories do %>
+                    <button
+                      phx-click="filter_category"
+                      phx-value-category={category}
+                      class={[
+                        "text-xs px-2 py-1 rounded transition",
+                        @category_filter == category &&
+                          "bg-blue-600 text-white font-medium",
+                        @category_filter != category &&
+                          "bg-slate-700 hover:bg-slate-600 text-slate-300"
+                      ]}
+                    >
+                      {category}
+                    </button>
+                  <% end %>
+                  <%= if @category_filter do %>
+                    <button
+                      phx-click="filter_category"
+                      phx-value-category={@category_filter}
+                      class="text-xs px-2 py-1 rounded bg-slate-800 text-slate-400 hover:text-slate-300"
+                    >
+                      ✕ Clear
+                    </button>
+                  <% end %>
+                </div>
+              <% end %>
 
               <%= if @generation_total > 0 and MapSet.size(@generating_concepts) > 0 do %>
                 <div class="mb-4 p-3 bg-blue-900/30 border border-blue-700/50 rounded-lg">
@@ -385,9 +429,14 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
                 </div>
               <% end %>
 
-              <div class="space-y-1">
+              <%!-- Scrollable Concepts List --%>
+              <div class="overflow-y-auto space-y-1 max-h-[800px]">
                 <%= if @selected_document do %>
-                  <%= for concept <- @concepts do %>
+                  <% filtered_concepts =
+                    if @category_filter,
+                      do: Enum.filter(@concepts, &(&1.category == @category_filter)),
+                      else: @concepts %>
+                  <%= for concept <- filtered_concepts do %>
                     <% concept_diagrams = diagrams_for_concept(@diagrams, concept.id) %>
                     <% is_expanded = MapSet.member?(@expanded_concepts, concept.id) %>
 
@@ -406,9 +455,6 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
                           <div class="flex gap-1 mt-1">
                             <span class="text-xs px-1.5 py-0.5 bg-slate-700 rounded">
                               {concept.category}
-                            </span>
-                            <span class="text-xs px-1.5 py-0.5 bg-slate-700 rounded">
-                              {concept.level}
                             </span>
                             <%= if length(concept_diagrams) > 0 do %>
                               <span class="text-xs px-1.5 py-0.5 bg-blue-900/50 text-blue-300 rounded">
@@ -484,6 +530,18 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
                 <% end %>
               </div>
             </div>
+
+            <%!-- Tips & Shortcuts (Bottom) --%>
+            <div class="bg-slate-900 rounded-xl p-4 mt-auto">
+              <div class="text-xs text-slate-400">
+                <div class="font-semibold text-slate-300 mb-1.5">💡 Tips & Shortcuts</div>
+                <ul class="space-y-0.5 list-disc pl-5">
+                  <li>Click concept names to expand/collapse diagram lists</li>
+                  <li>Select diagrams to view them in the main area</li>
+                  <li>Use "Generate from Prompt" for custom diagrams</li>
+                </ul>
+              </div>
+            </div>
           </div>
 
           <%!-- Right Main Area: Diagram Display + Generate --%>
@@ -492,20 +550,33 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
             <div class="bg-slate-900 rounded-xl p-6 flex-1 overflow-auto">
               <%= if @selected_diagram do %>
                 <div class="space-y-4">
-                  <div>
-                    <h2 class="text-2xl font-semibold mb-2">{@selected_diagram.title}</h2>
-                    <p class="text-slate-300">{@selected_diagram.summary}</p>
-                    <div class="flex gap-2 mt-2">
-                      <span class="text-xs px-2 py-1 bg-slate-800 rounded">
-                        {@selected_diagram.domain}
-                      </span>
-                      <span class="text-xs px-2 py-1 bg-slate-800 rounded">
-                        {@selected_diagram.level}
-                      </span>
-                      <%= for tag <- @selected_diagram.tags do %>
-                        <span class="text-xs px-2 py-1 bg-slate-700 rounded">
-                          {tag}
+                  <%!-- Two-column header: Title/Summary + Notes --%>
+                  <div class="grid grid-cols-2 gap-6">
+                    <%!-- Left: Title, Summary, Tags --%>
+                    <div>
+                      <h2 class="text-2xl font-semibold mb-2">{@selected_diagram.title}</h2>
+                      <p class="text-slate-300">{@selected_diagram.summary}</p>
+                      <div class="flex gap-2 mt-2">
+                        <span class="text-xs px-2 py-1 bg-slate-800 rounded">
+                          {@selected_diagram.domain}
                         </span>
+                        <%= for tag <- @selected_diagram.tags do %>
+                          <span class="text-xs px-2 py-1 bg-slate-700 rounded">
+                            {tag}
+                          </span>
+                        <% end %>
+                      </div>
+                    </div>
+
+                    <%!-- Right: Notes --%>
+                    <div>
+                      <%= if @selected_diagram.notes_md do %>
+                        <div class="text-sm text-slate-400">
+                          <div class="font-semibold text-slate-300 mb-1.5">Notes</div>
+                          <div class="overflow-y-auto max-h-24 [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:space-y-0.5 [&_li]:ml-0">
+                            {raw(markdown_to_html(@selected_diagram.notes_md))}
+                          </div>
+                        </div>
                       <% end %>
                     </div>
                   </div>
@@ -518,15 +589,6 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
                   >
                     <pre class="mermaid">{@selected_diagram.diagram_source}</pre>
                   </div>
-
-                  <%= if @selected_diagram.notes_md do %>
-                    <div class="text-sm text-slate-300 bg-slate-800/30 rounded-lg p-4">
-                      <div class="font-semibold mb-2">Notes:</div>
-                      <div class="prose prose-invert prose-sm max-w-none">
-                        {raw(@selected_diagram.notes_md)}
-                      </div>
-                    </div>
-                  <% end %>
                 </div>
               <% else %>
                 <div class="h-full flex items-center justify-center text-slate-500">
@@ -604,20 +666,6 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
                   <% end %>
                 </button>
               </form>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <%!-- Full-width Footer --%>
-      <div class="bg-slate-900 border-t border-slate-800">
-        <div class="container mx-auto px-4 py-4">
-          <div class="text-sm text-slate-400">
-            <div class="font-semibold text-slate-300 mb-2">💡 Tips & Shortcuts</div>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
-              <div>• Click concept names to expand/collapse diagram lists</div>
-              <div>• Select diagrams to view them in the main area</div>
-              <div>• Use "Generate from Prompt" for custom diagrams</div>
             </div>
           </div>
         </div>

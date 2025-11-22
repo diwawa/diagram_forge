@@ -52,14 +52,11 @@ defmodule DiagramForge.AI.Prompts do
           {
             "name": "short name for the concept",
             "short_description": "1–2 sentence description suitable for learners or interview prep.",
-            "category": "elixir | phoenix | http | kafka | llm | agents | other",
-            "level": "beginner | intermediate | advanced",
-            "importance": 1
+            "category": "elixir | phoenix | http | kafka | llm | agents | other"
           }
         ]
       }
 
-      importance is an integer from 1 to 5, where 5 is most important.
       Do not mention the JSON format in your response. Just output JSON.
       \"\"\"
 
@@ -78,14 +75,11 @@ defmodule DiagramForge.AI.Prompts do
         {
           "name": "short name for the concept",
           "short_description": "1–2 sentence description suitable for learners or interview prep.",
-          "category": "elixir | phoenix | http | kafka | llm | agents | other",
-          "level": "beginner | intermediate | advanced",
-          "importance": 1
+          "category": "elixir | phoenix | http | kafka | llm | agents | other"
         }
       ]
     }
 
-    importance is an integer from 1 to 5, where 5 is most important.
     Do not mention the JSON format in your response. Just output JSON.
     """
   end
@@ -111,7 +105,6 @@ defmodule DiagramForge.AI.Prompts do
 
     Name: #{concept.name}
     Category: #{concept.category}
-    Level: #{concept.level}
     Short description: #{concept.short_description}
 
     Context from the source document (optional, you may ignore irrelevant parts):
@@ -124,7 +117,6 @@ defmodule DiagramForge.AI.Prompts do
     {
       "title": "Readable title for the diagram",
       "domain": "elixir | phoenix | http | kafka | llm | agents | other",
-      "level": "beginner | intermediate | advanced",
       "tags": ["list", "of", "short", "tags"],
       "mermaid": "mermaid code here (flowchart or sequenceDiagram, escaped as needed)",
       "summary": "1–2 sentence explanation of what the diagram shows.",
@@ -158,14 +150,13 @@ defmodule DiagramForge.AI.Prompts do
     {
       "title": "...",
       "domain": "elixir | phoenix | http | kafka | llm | agents | other",
-      "level": "beginner | intermediate | advanced",
       "tags": ["...", "..."],
       "mermaid": "mermaid code here",
       "summary": "...",
       "notes_md": "markdown bullets..."
     }
 
-    Choose domain and level based on the description.
+    Choose domain based on the description.
     Only output JSON.
     """
   end

@@ -74,9 +74,7 @@ defmodule DiagramForge.Diagrams.ConceptExtractor do
       document_id: doc.id,
       name: attrs["name"],
       short_description: attrs["short_description"],
-      category: attrs["category"],
-      level: String.to_existing_atom(attrs["level"] || "beginner"),
-      importance: attrs["importance"] || 3
+      category: attrs["category"]
     }
 
     (existing || %Concept{})

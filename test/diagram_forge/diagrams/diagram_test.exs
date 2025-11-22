@@ -7,7 +7,6 @@ defmodule DiagramForge.Diagrams.DiagramTest do
   describe "Diagram schema" do
     test "has correct default values" do
       diagram = %Diagram{}
-      assert diagram.level == :beginner
       assert diagram.format == :mermaid
       assert diagram.tags == []
     end
@@ -36,13 +35,6 @@ defmodule DiagramForge.Diagrams.DiagramTest do
       end
     end
 
-    test "allows valid level values" do
-      for level <- [:beginner, :intermediate, :advanced] do
-        changeset = build(:diagram, level: level)
-        assert {:ok, _} = Repo.insert(changeset)
-      end
-    end
-
     test "optionally belongs to a concept" do
       document = fixture(:document)
       concept = fixture(:concept, document: document)
@@ -66,7 +58,6 @@ defmodule DiagramForge.Diagrams.DiagramTest do
           title: "GenServer Flow",
           slug: "genserver-flow",
           domain: "elixir",
-          level: :advanced,
           tags: ["otp", "concurrency"],
           format: :mermaid,
           diagram_source: "flowchart TD\n  A --> B",
@@ -78,7 +69,6 @@ defmodule DiagramForge.Diagrams.DiagramTest do
       assert diagram.title == "GenServer Flow"
       assert diagram.slug == "genserver-flow"
       assert diagram.domain == "elixir"
-      assert diagram.level == :advanced
       assert diagram.tags == ["otp", "concurrency"]
       assert diagram.format == :mermaid
       assert diagram.diagram_source == "flowchart TD\n  A --> B"

@@ -15,8 +15,6 @@ defmodule DiagramForge.Diagrams.Concept do
     field :name, :string
     field :short_description, :string
     field :category, :string
-    field :level, Ecto.Enum, values: [:beginner, :intermediate, :advanced], default: :beginner
-    field :importance, :integer, default: 3
 
     has_many :diagrams, DiagramForge.Diagrams.Diagram
 
@@ -25,8 +23,7 @@ defmodule DiagramForge.Diagrams.Concept do
 
   def changeset(concept, attrs) do
     concept
-    |> cast(attrs, [:document_id, :name, :short_description, :category, :level, :importance])
+    |> cast(attrs, [:document_id, :name, :short_description, :category])
     |> validate_required([:name, :category])
-    |> validate_number(:importance, greater_than_or_equal_to: 1, less_than_or_equal_to: 5)
   end
 end

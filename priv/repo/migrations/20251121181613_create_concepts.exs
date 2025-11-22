@@ -7,8 +7,6 @@ defmodule DiagramForge.Repo.Migrations.CreateConcepts do
       add :name, :string, null: false
       add :short_description, :text
       add :category, :string, null: false
-      add :level, :string, null: false, default: "beginner"
-      add :importance, :integer, default: 3
 
       timestamps()
     end

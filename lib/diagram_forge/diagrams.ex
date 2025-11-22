@@ -109,7 +109,7 @@ defmodule DiagramForge.Diagrams do
     Repo.all(
       from c in Concept,
         where: c.document_id == ^document_id,
-        order_by: [desc: c.importance, asc: c.name]
+        order_by: [asc: c.name]
     )
   end
 

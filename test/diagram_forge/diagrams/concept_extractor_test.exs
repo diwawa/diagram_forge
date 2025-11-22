@@ -191,32 +191,6 @@ defmodule DiagramForge.Diagrams.ConceptExtractorTest do
       assert concepts == []
     end
 
-    test "uses default values for optional fields" do
-      document = fixture(:document, raw_text: "Some text.")
-
-      ai_response = %{
-        "concepts" => [
-          %{
-            "name" => "TestConcept",
-            "short_description" => "A test concept",
-            "category" => "testing"
-            # Missing level and importance
-          }
-        ]
-      }
-
-      expect(MockAIClient, :chat!, fn _messages, _opts ->
-        Jason.encode!(ai_response)
-      end)
-
-      concepts = ConceptExtractor.extract_for_document(document, ai_client: MockAIClient)
-
-      assert length(concepts) == 1
-      concept = hd(concepts)
-      assert concept.level == :beginner
-      assert concept.importance == 3
-    end
-
     test "updates existing concept instead of creating duplicate" do
       document = fixture(:document, raw_text: "Some text.")
 
@@ -225,8 +199,7 @@ defmodule DiagramForge.Diagrams.ConceptExtractorTest do
         fixture(:concept,
           document: document,
           name: "GenServer",
-          short_description: "Old description",
-          importance: 2
+          short_description: "Old description"
         )
 
       # Mock AI to return the same concept with updated attributes
@@ -235,9 +208,7 @@ defmodule DiagramForge.Diagrams.ConceptExtractorTest do
           %{
             "name" => "GenServer",
             "short_description" => "New description",
-            "category" => "elixir",
-            "level" => "advanced",
-            "importance" => 5
+            "category" => "elixir"
           }
         ]
       }
@@ -255,39 +226,10 @@ defmodule DiagramForge.Diagrams.ConceptExtractorTest do
       assert updated_concept.id == existing_concept.id
       # But with updated attributes
       assert updated_concept.short_description == "New description"
-      assert updated_concept.importance == 5
-      assert updated_concept.level == :advanced
 
       # Verify only one concept exists in database
       saved_concepts = Repo.all(from c in Concept, where: c.document_id == ^document.id)
       assert length(saved_concepts) == 1
-    end
-
-    test "properly converts level string to atom" do
-      document = fixture(:document, raw_text: "Some text.")
-
-      for level <- ["beginner", "intermediate", "advanced"] do
-        ai_response = %{
-          "concepts" => [
-            %{
-              "name" => "Concept#{level}",
-              "short_description" => "Test",
-              "category" => "test",
-              "level" => level,
-              "importance" => 3
-            }
-          ]
-        }
-
-        expect(MockAIClient, :chat!, fn _messages, _opts ->
-          Jason.encode!(ai_response)
-        end)
-
-        concepts = ConceptExtractor.extract_for_document(document, ai_client: MockAIClient)
-
-        assert length(concepts) == 1
-        assert hd(concepts).level == String.to_existing_atom(level)
-      end
     end
 
     test "associates extracted concepts with the correct document" do

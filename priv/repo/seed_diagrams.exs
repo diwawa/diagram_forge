@@ -1,10 +1,11 @@
 # Script for populating the database with sample concepts and diagrams.
 # Run via: mix seed.diagrams
 
+import Ecto.Query
 alias DiagramForge.Repo
 alias DiagramForge.Diagrams.{Document, Concept, Diagram}
 
-# Clear existing data (optional - comment out if you want to keep existing data)
+# Clear existing data
 IO.puts("Clearing existing diagrams, concepts, and documents...")
 Repo.delete_all(Diagram)
 Repo.delete_all(Concept)
@@ -16,224 +17,60 @@ IO.puts("Creating seed document...")
 document =
   %Document{}
   |> Document.changeset(%{
-    title: "Software Architecture and ML Integration Patterns",
+    title: "Distributed Systems & ML Architecture Patterns",
     source_type: :markdown,
-    path: "docs/technical-concepts.md",
+    path: "docs/technical-patterns.md",
     status: :ready,
     raw_text: """
-    This document contains 25 technical concepts covering Elixir/OTP distributed systems,
-    machine learning integration, event-driven architectures, and infrastructure patterns
-    commonly used in modern production systems.
+    Technical patterns for building distributed systems with Elixir/OTP,
+    event-driven architectures with Kafka, ML model serving, and database optimization.
     """
   })
   |> Repo.insert!()
 
 IO.puts("Document created with ID: #{document.id}")
 
-# Define concepts
+# Define broader concepts (each will have multiple diagrams)
 concepts_data = [
   %{
-    name: "GenServer call vs cast",
+    name: "GenServer Patterns",
     short_description:
-      "How synchronous call and asynchronous cast interact with a GenServer and their trade-offs.",
-    category: "elixir",
-    level: :intermediate,
-    importance: 5
+      "Core patterns for building concurrent services with GenServer: synchronous calls, asynchronous casts, state management, and timeouts.",
+    category: "elixir"
   },
   %{
-    name: "OTP supervision tree basics",
+    name: "OTP Supervision",
     short_description:
-      "How supervisors organize workers into trees and apply different restart strategies.",
-    category: "elixir",
-    level: :intermediate,
-    importance: 5
+      "Organizing processes into supervision trees with different restart strategies for fault tolerance.",
+    category: "elixir"
   },
   %{
-    name: "Fault tolerance with Elixir processes",
+    name: "Event-Driven Processing",
     short_description:
-      "Letting processes crash and using supervisors to restart them for fault isolation.",
-    category: "elixir",
-    level: :intermediate,
-    importance: 5
+      "Processing event streams with Kafka, Broadway, and event sourcing patterns for scalable data pipelines.",
+    category: "kafka"
   },
   %{
-    name: "Kafka and Broadway event-driven processing",
+    name: "ML Model Serving",
     short_description:
-      "Using Kafka topics and Broadway pipelines to process streams of events in Elixir.",
-    category: "elixir",
-    level: :intermediate,
-    importance: 5
+      "Patterns for serving ML predictions: caching strategies, fallback logic, edge vs cloud inference, and model lifecycle management.",
+    category: "ml"
   },
   %{
-    name: "Prediction-serving API with fallback logic",
+    name: "Database Optimization",
     short_description:
-      "Designing a prediction API with cache, cloud ML calls, and local fallback behavior.",
-    category: "ml",
-    level: :advanced,
-    importance: 5
+      "PostgreSQL indexing strategies, query optimization, and partitioning for analytics workloads.",
+    category: "postgres"
   },
   %{
-    name: "Cloud ML inference with Vertex AI",
+    name: "Distributed System Infrastructure",
     short_description:
-      "Calling a managed Vertex AI endpoint from an Elixir service using feature data.",
-    category: "ml",
-    level: :intermediate,
-    importance: 4
-  },
-  %{
-    name: "Edge vs cloud inference architecture",
-    short_description:
-      "Balancing latency, accuracy, and cost between edge inference and cloud inference.",
-    category: "ml",
-    level: :intermediate,
-    importance: 4
-  },
-  %{
-    name: "Demand forecasting API architecture",
-    short_description:
-      "Integrating forecasting models with order and inventory data via an API.",
-    category: "operations",
-    level: :intermediate,
-    importance: 5
-  },
-  %{
-    name: "Intelligent routing ML pipeline",
-    short_description: "Using ML to generate and rank routing options for operational decisions.",
-    category: "operations",
-    level: :advanced,
-    importance: 5
-  },
-  %{
-    name: "Supply chain anomaly detection loop",
-    short_description:
-      "Streaming operational events into an anomaly detector and alerting ops teams.",
-    category: "operations",
-    level: :intermediate,
-    importance: 4
-  },
-  %{
-    name: "Caching ML predictions with ETS and Redis",
-    short_description: "A two-level cache using ETS and Redis to reduce repeated ML calls.",
-    category: "elixir",
-    level: :intermediate,
-    importance: 5
-  },
-  %{
-    name: "Rate limiting LLM API requests",
-    short_description:
-      "Using a gateway and rate limiter to protect external LLM providers and enforce quotas.",
-    category: "infra",
-    level: :intermediate,
-    importance: 4
-  },
-  %{
-    name: "Semantic search with embeddings and vector DB",
-    short_description:
-      "Generating embeddings and using a vector database to find semantically similar items.",
-    category: "ml",
-    level: :intermediate,
-    importance: 5
-  },
-  %{
-    name: "Observability pipeline for ML-powered services",
-    short_description:
-      "Collecting logs, metrics, and traces from services into observability backends.",
-    category: "infra",
-    level: :intermediate,
-    importance: 4
-  },
-  %{
-    name: "Circuit breaker and retry around ML calls",
-    short_description:
-      "Protecting services that call ML endpoints using retries and circuit breakers.",
-    category: "infra",
-    level: :intermediate,
-    importance: 4
-  },
-  %{
-    name: "Real-time data pipeline feeding ML features",
-    short_description:
-      "Streaming operational events into feature stores for online and offline ML.",
-    category: "ml",
-    level: :intermediate,
-    importance: 5
-  },
-  %{
-    name: "Postgres indexing for analytics queries",
-    short_description:
-      "Using BTREE, GIN/GIST indexes and partitioning to speed up analytics workloads.",
-    category: "infra",
-    level: :intermediate,
-    importance: 4
-  },
-  %{
-    name: "Event sourcing in operational workflows",
-    short_description:
-      "Modeling business processes as event streams with projections for read models.",
-    category: "operations",
-    level: :advanced,
-    importance: 4
-  },
-  %{
-    name: "Inventory and WMS/OMS/TMS data flow",
-    short_description:
-      "How inventory, order management, warehouse, and transportation systems interact.",
-    category: "operations",
-    level: :beginner,
-    importance: 4
-  },
-  %{
-    name: "Real-time routing decision architecture",
-    short_description:
-      "Combining ML routing models with a policy engine for real-time route selection.",
-    category: "operations",
-    level: :advanced,
-    importance: 5
-  },
-  %{
-    name: "ML model lifecycle from training to monitoring",
-    short_description:
-      "The end-to-end lifecycle of an ML model: data, training, deployment, and monitoring.",
-    category: "ml",
-    level: :beginner,
-    importance: 4
-  },
-  %{
-    name: "Autoscaling inference services",
-    short_description:
-      "Scaling inference services horizontally based on load and performance metrics.",
-    category: "infra",
-    level: :intermediate,
-    importance: 4
-  },
-  %{
-    name: "Feature store for real-time ML",
-    short_description:
-      "Using online and offline feature stores to support training and low-latency inference.",
-    category: "ml",
-    level: :intermediate,
-    importance: 5
-  },
-  %{
-    name: "LLM tool-calling workflow for operations",
-    short_description:
-      "Using an LLM to orchestrate calls to operational tools like order status and rate lookup.",
-    category: "ml",
-    level: :advanced,
-    importance: 4
-  },
-  %{
-    name: "Multi-layer fallback: cache, edge, cloud",
-    short_description:
-      "A layered fallback strategy from cache to edge inference to cloud inference.",
-    category: "infra",
-    level: :intermediate,
-    importance: 4
+      "Observability pipelines, circuit breakers, autoscaling, and multi-layer caching for resilient services.",
+    category: "infrastructure"
   }
 ]
 
-# Insert concepts
-IO.puts("Inserting #{length(concepts_data)} concepts...")
+IO.puts("Creating #{length(concepts_data)} concepts...")
 
 concepts =
   Enum.map(concepts_data, fn concept_attrs ->
@@ -244,720 +81,671 @@ concepts =
 
 IO.puts("Concepts created successfully")
 
-# Define diagrams (matched to concepts by index)
-diagrams_data = [
-  %{
-    title: "GenServer Call vs Cast",
-    slug: "genserver-call-vs-cast",
-    domain: "elixir",
-    level: :intermediate,
-    tags: ["elixir", "genserver", "otp", "concurrency"],
-    format: :mermaid,
-    diagram_source: """
-    sequenceDiagram
-      participant C as Caller
-      participant G as GenServer
+# Helper function to create a URL-safe slug from a title
+generate_slug = fn title ->
+  title
+  |> String.downcase()
+  |> String.replace(~r/[^a-z0-9\s-]/, "")
+  |> String.replace(~r/\s+/, "-")
+  |> String.replace(~r/-+/, "-")
+  |> String.trim("-")
+end
 
-      C->>G: call(request)
-      G-->>C: reply(response)
-
-      C-)G: cast(message)
-      Note right of G: Cast is async, no reply
-
-      C->>G: call(long_op)
-      Note over C,G: Caller blocks until GenServer replies
-    """,
-    summary: "Illustrates the difference between synchronous call and asynchronous cast in a GenServer.",
-    notes_md: """
-    - `call/2` is synchronous and expects a reply.
-    - `cast/2` is asynchronous and returns immediately.
-    - Use `call` when the caller needs a result; use `cast` for fire-and-forget updates.
-    """
-  },
-  %{
-    title: "OTP Supervision Tree Basics",
-    slug: "otp-supervision-tree-basics",
-    domain: "elixir",
-    level: :intermediate,
-    tags: ["elixir", "otp", "supervision", "fault-tolerance"],
-    format: :mermaid,
-    diagram_source: """
-    flowchart TD
-      R[Application Root Supervisor]
-      R --> S1[Supervisor: one_for_one]
-      R --> S2[Supervisor: rest_for_one]
-
-      S1 --> A[GenServer A]
-      S1 --> B[GenServer B]
-
-      S2 --> C[GenServer C]
-      S2 --> D[GenServer D]
-
-      classDef sup fill:#1f2933,stroke:#4b5563,color:#e5e7eb;
-      class R,S1,S2 sup;
-    """,
-    summary: "Shows a basic OTP supervision tree with different restart strategies.",
-    notes_md: """
-    - Root supervisor starts sub-supervisors and workers.
-    - `one_for_one`: only the crashed child is restarted.
-    - `rest_for_one`: crashed child and all children started after it are restarted.
-    - Supervision trees isolate failures and keep the system resilient.
-    """
-  },
-  %{
-    title: "Fault Tolerance in Elixir Processes",
-    slug: "fault-tolerance-elixir-processes",
-    domain: "elixir",
-    level: :intermediate,
-    tags: ["elixir", "otp", "fault-tolerance", "supervision"],
-    format: :mermaid,
-    diagram_source: """
-    flowchart LR
-      Client[Client Process]
-      W[Worker Process]
-      S[Supervisor]
-
-      Client -->|request| W
-      W -->|crash| X((Exit Signal))
-      X --> S
-      S -->|restart| W2[New Worker Process]
-
-      Note right of W2: State restored via init/1
-    """,
-    summary: "Demonstrates how supervisors detect worker crashes and restart them.",
-    notes_md: """
-    - Workers are allowed to crash instead of handling every error.
-    - Supervisors trap exits and apply a restart strategy.
-    - Faults are isolated to failing processes, protecting the rest of the system.
-    """
-  },
-  %{
-    title: "Kafka + Broadway Event-Driven Processing",
-    slug: "kafka-broadway-event-driven",
-    domain: "elixir",
-    level: :intermediate,
-    tags: ["kafka", "broadway", "events", "streaming"],
-    format: :mermaid,
-    diagram_source: """
-    flowchart LR
-      P[Producers<br/>Order Events] --> K[(Kafka Topic<br/>orders)]
-      K --> CG[Consumer Group<br/>Broadway Pipeline]
-
-      CG --> ST1[Stage 1:<br/>Deserialize & Validate]
-      ST1 --> ST2[Stage 2:<br/>Enrich with Inventory]
-      ST2 --> ST3[Stage 3:<br/>Publish ML Features]
-
-      ST3 --> FS[Feature Store]
-      ST3 --> DB[(Postgres)]
-    """,
-    summary: "Shows how Kafka and Broadway work together to process event streams and feed ML features.",
-    notes_md: """
-    - Producers write order events into a Kafka topic.
-    - Broadway consumers read from Kafka, process in stages, and handle backpressure.
-    - Enriched data is written to a feature store and Postgres for downstream ML and analytics.
-    """
-  },
-  %{
-    title: "Prediction-Serving API with Fallback Logic",
-    slug: "prediction-serving-api-fallback",
-    domain: "ml",
-    level: :advanced,
-    tags: ["ml", "api", "fallback", "resilience"],
-    format: :mermaid,
-    diagram_source: """
-    flowchart TD
-      C[Client Service] --> API[Prediction API]
-
-      API -->|cache lookup| Cache[(Prediction Cache)]
-      Cache -->|hit| R1[Return Cached Prediction]
-
-      API -->|miss| VAI[Cloud ML Service<br/>Vertex/Modal]
-      VAI -->|success| R2[Return Fresh Prediction]
-      VAI -->|failure/timeout| F[Fallback Logic]
-
-      F --> ETS[(Local Heuristics<br/>or Rule Engine)]
-      ETS --> R3[Return Fallback Prediction]
-
-      R2 --> Cache
-    """,
-    summary: "Describes a resilient prediction-serving API with cache, cloud ML, and local fallback.",
-    notes_md: """
-    - Check cache first to avoid unnecessary ML calls.
-    - On cache miss, call the cloud ML service.
-    - If ML service fails or times out, use a local heuristic or last-known-good value.
-    - Successful predictions are written back to the cache.
-    """
-  },
-  %{
-    title: "Cloud ML Inference Flow with Vertex AI",
-    slug: "cloud-ml-inference-vertex-ai",
-    domain: "ml",
-    level: :intermediate,
-    tags: ["vertex-ai", "gcp", "ml", "inference"],
-    format: :mermaid,
-    diagram_source: """
-    sequenceDiagram
-      participant S as Elixir Service
-      participant FG as Feature Store/DB
-      participant V as Vertex AI Endpoint
-
-      S->>FG: Fetch features for entity
-      FG-->>S: Feature vector
-
-      S->>V: HTTP/JSON predict(features)
-      V-->>S: Prediction result
-
-      S->>S: Apply business rules
-      S-->>Caller: Response with prediction
-    """,
-    summary: "Shows how an Elixir service calls a Vertex AI endpoint using features from a store.",
-    notes_md: """
-    - Service loads feature vectors from a feature store or DB.
-    - Sends features to a Vertex AI endpoint for prediction.
-    - Applies domain-specific rules before returning to the caller.
-    - Latency and error handling are critical at each step.
-    """
-  },
-  %{
-    title: "Edge vs Cloud Inference Architecture",
-    slug: "edge-vs-cloud-inference",
-    domain: "ml",
-    level: :intermediate,
-    tags: ["edge", "cloud", "inference", "latency"],
-    format: :mermaid,
-    diagram_source: """
-    flowchart TD
-      Client[Client Request] --> GW[Inference Gateway]
-
-      GW --> E[Edge Model<br/>Cloudflare Workers/Edge]
-      E -->|fast success| R1[Return Edge Prediction]
-
-      E -->|not available/low confidence| CML[Cloud ML Service]
-      CML -->|success| R2[Return Cloud Prediction]
-
-      CML -->|failure| F[Fallback (Cache/Heuristics)]
-    """,
-    summary: "Compares edge inference with cloud inference and how a gateway chooses between them.",
-    notes_md: """
-    - Edge inference offers lower latency but may use smaller or specialized models.
-    - Cloud inference offers higher accuracy or more complex models.
-    - Gateway decides based on availability, confidence, or cost.
-    - Fallbacks protect user experience when both paths fail.
-    """
-  },
-  %{
-    title: "Demand Forecasting API Architecture",
-    slug: "demand-forecasting-api-architecture",
-    domain: "operations",
-    level: :intermediate,
-    tags: ["demand-forecasting", "api", "operations", "ml"],
-    format: :mermaid,
-    diagram_source: """
-    flowchart LR
-      UI[Internal Tools / Services] --> API[Demand Forecasting API]
-
-      API --> FT[Feature Builder]
-      FT --> HDB[(Historical Orders)]
-      FT --> INV[(Inventory & Lead Times)]
-
-      FT --> ML[Forecasting Model<br/>(Vertex/Modal)]
-      ML --> FC[Forecast Results]
-
-      FC --> API
-      FC --> DB[(Forecast DB)]
-      FC --> BI[BI Dashboards]
-    """,
-    summary: "Shows the components involved in serving demand forecasts via an API.",
-    notes_md: """
-    - API receives forecast requests for SKUs/locations/time ranges.
-    - Feature builder combines historical orders, inventory, and lead-time data.
-    - Forecasting model returns predicted demand.
-    - Results are persisted for BI and re-use.
-    """
-  },
-  %{
-    title: "Intelligent Routing ML Pipeline",
-    slug: "intelligent-routing-ml-pipeline",
-    domain: "operations",
-    level: :advanced,
-    tags: ["routing", "operations", "ml", "optimization"],
-    format: :mermaid,
-    diagram_source: """
-    flowchart LR
-      O[Orders & Destinations] --> FP[Feature Pipeline]
-      WH[Warehouse Data] --> FP
-      SH[Carrier/Shipping Rates] --> FP
-
-      FP --> M[Routing Model]
-      M --> R[Ranked Route Options]
-
-      R --> ES[Execution Service]
-      ES --> OMS[(Order Management)]
-      ES --> WMS[(Warehouse Management)]
-    """,
-    summary: "Illustrates a pipeline that generates ML-based routing recommendations for operations.",
-    notes_md: """
-    - Features combine order data, warehouse capabilities, and carrier rates.
-    - Model outputs ranked route options or scores.
-    - Execution service chooses a route and updates OMS/WMS.
-    - Feedback from actual performance can be fed back into training.
-    """
-  },
-  %{
-    title: "Supply Chain Anomaly Detection Loop",
-    slug: "supply-chain-anomaly-detection",
-    domain: "operations",
-    level: :intermediate,
-    tags: ["anomaly-detection", "monitoring", "operations"],
-    format: :mermaid,
-    diagram_source: """
-    flowchart TD
-      E[Events<br/>Shipments, Scans, Delays] --> SP[Streaming Pipeline]
-      SP --> FE[Feature Extraction]
-      FE --> AD[Anomaly Detection Model]
-
-      AD -->|normal| NS[No Alert]
-      AD -->|anomaly| AL[Alert Service]
-
-      AL --> OP[Ops Dashboard]
-      AL --> NT[Notifications<br/>(Email/SMS/Webhook)]
-    """,
-    summary: "Shows how operational events are monitored for anomalies in a supply chain.",
-    notes_md: """
-    - Event stream includes tracking scans, delays, inventory changes.
-    - Features capture deviations from expected timelines or volumes.
-    - Model flags anomalies which trigger alerts to ops teams.
-    - Feedback on false positives can improve the model.
-    """
-  },
-  %{
-    title: "Caching ML Predictions with ETS and Redis",
-    slug: "caching-ml-predictions-ets-redis",
-    domain: "elixir",
-    level: :intermediate,
-    tags: ["caching", "ets", "redis", "ml"],
-    format: :mermaid,
-    diagram_source: """
-    flowchart TD
-      C[Caller] --> S[Prediction Service]
-
-      S --> ETS[(ETS In-Memory Cache)]
-      ETS -->|hit| R1[Return Cached Prediction]
-
-      ETS -->|miss| RDS[(Redis Cache)]
-      RDS -->|hit| R2[Return Redis Prediction]
-      RDS -->|miss| ML[ML Service]
-
-      ML --> R3[Return New Prediction]
-      R3 --> ETS
-      R3 --> RDS
-    """,
-    summary: "Describes a two-level caching strategy for ML predictions using ETS and Redis.",
-    notes_md: """
-    - ETS provides very fast in-memory cache on each BEAM node.
-    - Redis offers a shared distributed cache across nodes.
-    - Cache lookup is layered: ETS → Redis → ML Service.
-    - Positive responses are written back to both caches.
-    """
-  },
-  %{
-    title: "Rate Limiting LLM API Requests",
-    slug: "rate-limiting-llm-api-requests",
-    domain: "infra",
-    level: :intermediate,
-    tags: ["llm", "rate-limiting", "api-gateway"],
-    format: :mermaid,
-    diagram_source: """
-    flowchart TD
-      C[Internal Services] --> GW[LLM Gateway]
-      GW --> RL[Rate Limiter<br/>(Token Bucket)]
-      RL --> Q[Request Queue]
-      Q --> LLM[LLM Provider<br/>OpenAI/Anthropic]
-
-      RL -->|limit exceeded| F[Fast Fail / Fallback]
-    """,
-    summary: "Shows how a gateway can apply rate limiting before forwarding LLM requests.",
-    notes_md: """
-    - Gateway centralizes access to external LLM providers.
-    - Rate limiter enforces global or per-tenant quotas.
-    - Requests above the limit are rejected quickly or routed to fallbacks.
-    - Queue smooths bursts while respecting provider limits.
-    """
-  },
-  %{
-    title: "Semantic Search with Embeddings and Vector DB",
-    slug: "semantic-search-embeddings-vector-db",
-    domain: "ml",
-    level: :intermediate,
-    tags: ["embeddings", "vector-db", "semantic-search"],
-    format: :mermaid,
-    diagram_source: """
-    flowchart LR
-      DOCS[Documents/Records] --> EG[Embedding Generator]
-      EG --> VDB[(Vector DB)]
-
-      Q[User Query] --> QE[Query Embedding]
-      QE --> VDB
-      VDB --> RES[Top-k Similar Items]
-
-      RES --> APP[Application / LLM]
-    """,
-    summary: "Explains how semantic search works using embeddings stored in a vector database.",
-    notes_md: """
-    - Off-line pipeline embeds documents and stores vectors in a vector DB.
-    - At query time, the query is also embedded.
-    - Vector DB performs nearest-neighbor search to find similar items.
-    - Results can be used directly or as context for an LLM.
-    """
-  },
-  %{
-    title: "Observability Pipeline for ML-Powered Services",
-    slug: "observability-pipeline-ml-services",
-    domain: "infra",
-    level: :intermediate,
-    tags: ["observability", "logging", "metrics", "tracing"],
-    format: :mermaid,
-    diagram_source: """
-    flowchart LR
-      SVC[Elixir Services] --> L[Logs]
-      SVC --> M[Metrics]
-      SVC --> T[Traces]
-
-      L --> LOG[(Log Store<br/>e.g. Loki/ELK)]
-      M --> TS[(Time-Series DB<br/>Prometheus)]
-      T --> TP[(Tracing Backend<br/>Jaeger/Tempo)]
-
-      LOG --> DASH[Dashboards & Alerts]
-      TS --> DASH
-      TP --> DASH
-    """,
-    summary: "Shows how logs, metrics, and traces flow from services into observability backends.",
-    notes_md: """
-    - Services emit structured logs, metrics, and traces.
-    - Logs help with debugging; metrics with SLOs and alerts; traces with request flows.
-    - Dashboards aggregate data and trigger alerts to on-call engineers.
-    """
-  },
-  %{
-    title: "Circuit Breaker and Retry Around ML Calls",
-    slug: "circuit-breaker-retry-ml-calls",
-    domain: "infra",
-    level: :intermediate,
-    tags: ["resilience", "circuit-breaker", "retries", "ml"],
-    format: :mermaid,
-    diagram_source: """
-    flowchart TD
-      C[Caller] --> CB[Circuit Breaker]
-      CB -->|closed| ML[ML Service]
-      CB -->|open| FB[Fallback Response]
-
-      ML -->|success| S[Store Success Metrics]
-      ML -->|failure| RT[Retry with Backoff]
-
-      RT -->|max retries exceeded| E[Record Error & Trip Breaker]
-      E --> CB
-    """,
-    summary: "Illustrates how a circuit breaker and retry strategy protect services calling ML endpoints.",
-    notes_md: """
-    - Circuit breaker starts closed and forwards calls to ML service.
-    - Repeated failures trip the breaker to open state, short-circuiting calls.
-    - Retries use exponential backoff to avoid hammering the provider.
-    - Fallback responses protect user experience during outages.
-    """
-  },
-  %{
-    title: "Real-Time Data Pipeline Feeding ML Features",
-    slug: "real-time-data-pipeline-ml-features",
-    domain: "ml",
-    level: :intermediate,
-    tags: ["streaming", "features", "kafka", "ml"],
-    format: :mermaid,
-    diagram_source: """
-    flowchart LR
-      EV[Operational Events<br/>Orders, Scans, Updates] --> STR[Streaming Bus<br/>Kafka/PubSub]
-      STR --> FE[Feature Builder]
-      FE --> FS[(Online Feature Store)]
-      FE --> FD[(Offline Feature Store)]
-
-      FS --> INF[Online Inference]
-      FD --> TR[Training Jobs]
-    """,
-    summary: "Shows a unified pipeline where streaming events feed online and offline feature stores.",
-    notes_md: """
-    - Operational events flow through a streaming bus.
-    - Feature builder derives features in near real-time.
-    - Online store serves models for low-latency inference.
-    - Offline store feeds batch training and backfills.
-    """
-  },
-  %{
-    title: "Postgres Indexing for Analytics Queries",
-    slug: "postgres-indexing-analytics-queries",
-    domain: "infra",
-    level: :intermediate,
-    tags: ["postgres", "indexing", "analytics"],
-    format: :mermaid,
-    diagram_source: """
-    flowchart TD
-      Q[Analytics Queries] --> PG[(Postgres)]
-
-      PG --> IDX1[BTREE Indexes<br/>Primary Keys, FK Lookups]
-      PG --> IDX2[GIN/GIST Indexes<br/>JSONB & Full-Text]
-      PG --> PT[Partitioned Tables<br/>by Date/Tenant]
-
-      PT --> FASTER[More predictable query times]
-    """,
-    summary: "Visualizes different Postgres indexing and partitioning strategies for analytics workloads.",
-    notes_md: """
-    - BTREE indexes are ideal for equality and range lookups on common columns.
-    - GIN/GIST indexes help with JSONB and full-text search.
-    - Partitioning large tables by date or tenant improves pruning and performance.
-    """
-  },
-  %{
-    title: "Event Sourcing in Operational Workflows",
-    slug: "event-sourcing-operations",
-    domain: "operations",
-    level: :advanced,
-    tags: ["event-sourcing", "operations", "cqrs"],
-    format: :mermaid,
-    diagram_source: """
-    flowchart LR
-      CMD[Command<br/>Ship Order] --> AGG[Order Aggregate]
-      AGG --> EVTS[(Event Store<br/>OrderCreated, Packed, Shipped)]
-
-      EVTS --> PRJ1[Projection<br/>Current Order State]
-      EVTS --> PRJ2[Projection<br/>Shipment Timeline]
-      EVTS --> PRJ3[Projection<br/>Analytics Views]
-    """,
-    summary: "Shows how event sourcing models operational workflows using an event store and projections.",
-    notes_md: """
-    - Commands mutate aggregates which emit events.
-    - Events are stored immutably in an event store.
-    - Projections build read models for current state, timelines, and analytics.
-    - Replay of events can rebuild projections or audit history.
-    """
-  },
-  %{
-    title: "Inventory to WMS/OMS/TMS Data Flow",
-    slug: "inventory-wms-oms-tms-flow",
-    domain: "operations",
-    level: :beginner,
-    tags: ["wms", "oms", "tms", "inventory"],
-    format: :mermaid,
-    diagram_source: """
-    flowchart LR
-      INV[(Inventory<br/>SKU, Qty, Location)] --> WMS[WMS<br/>Warehouse Management]
-      C[Customer Orders] --> OMS[OMS<br/>Order Management]
-
-      OMS --> WMS
-      WMS --> TMS[TMS<br/>Transportation Management]
-      TMS --> CARR[Carriers / Shipping APIs]
-
-      WMS --> INVUPD[Inventory Updates]
-      INVUPD --> INV
-    """,
-    summary: "Explains how inventory, WMS, OMS, and TMS systems interact in a fulfillment flow.",
-    notes_md: """
-    - OMS accepts customer orders and coordinates with WMS to fulfill them.
-    - WMS manages inventory, picking, packing, and updates on-hand quantities.
-    - TMS handles shipment creation and communication with carriers.
-    - Inventory stays in sync via continuous updates from WMS.
-    """
-  },
-  %{
-    title: "Real-Time Routing Decision Architecture",
-    slug: "real-time-routing-decision-architecture",
-    domain: "operations",
-    level: :advanced,
-    tags: ["routing", "real-time", "operations", "ml"],
-    format: :mermaid,
-    diagram_source: """
-    flowchart LR
-      ORD[Incoming Order] --> RS[Routing Service]
-
-      RS --> FE[Feature Builder]
-      FE --> RT[Routing Model API]
-      RT --> OPTIONS[Ranked Fulfillment Options]
-
-      OPTIONS --> POL[Policy Engine<br/>SLAs, Costs, Constraints]
-      POL --> CHOICE[Selected Route]
-
-      CHOICE --> OMS[(OMS)]
-      CHOICE --> WMS[(WMS)]
-    """,
-    summary: "Shows how real-time routing decisions are made using ML plus business rules.",
-    notes_md: """
-    - Routing service builds features for an ML model based on order and network state.
-    - Model proposes ranked options (warehouse, carrier, service level).
-    - Policy engine applies SLAs and constraints to pick a final option.
-    - OMS/WMS execute the chosen route.
-    """
-  },
-  %{
-    title: "ML Model Lifecycle: Training to Monitoring",
-    slug: "ml-model-lifecycle-training-monitoring",
-    domain: "ml",
-    level: :beginner,
-    tags: ["ml", "lifecycle", "training", "monitoring"],
-    format: :mermaid,
-    diagram_source: """
-    flowchart LR
-      DS[Data Sources] --> FE[Feature Engineering]
-      FE --> TR[Training Jobs]
-      TR --> REG[Model Registry]
-      REG --> DEP[Deployment<br/>Online Endpoint]
-
-      DEP --> INF[Inference Traffic]
-      INF --> MON[Monitoring<br/>Metrics & Drift]
-      MON -->|feedback| FE
-    """,
-    summary: "Outlines the lifecycle of an ML model from data to training, deployment, and monitoring.",
-    notes_md: """
-    - Raw data is transformed into training features.
-    - Models are trained and versioned in a registry.
-    - Deployed models receive live traffic and predictions are monitored.
-    - Feedback loop from monitoring back to feature engineering and retraining.
-    """
-  },
-  %{
-    title: "Autoscaling Inference Services",
-    slug: "autoscaling-inference-services",
-    domain: "infra",
-    level: :intermediate,
-    tags: ["autoscaling", "k8s", "inference", "load"],
-    format: :mermaid,
-    diagram_source: """
-    flowchart TD
-      CL[Client Requests] --> LB[Load Balancer]
-      LB --> POD1[Inference Pod 1]
-      LB --> POD2[Inference Pod 2]
-      LB --> PODN[Inference Pod N]
-
-      POD1 --> MET[Metrics<br/>CPU, QPS, Latency]
-      POD2 --> MET
-      PODN --> MET
-
-      MET --> HPA[Autoscaler]
-      HPA -->|scale out/in| K8S[Kubernetes Cluster]
-    """,
-    summary: "Shows how inference services scale horizontally based on load and metrics.",
-    notes_md: """
-    - Load balancer distributes requests across pods or instances.
-    - Metrics (CPU, QPS, latency) feed into an autoscaler.
-    - Autoscaler adjusts replica counts in response to demand.
-    - Proper scaling avoids both over-provisioning and overload.
-    """
-  },
-  %{
-    title: "Feature Store Overview for Real-Time ML",
-    slug: "feature-store-overview-real-time-ml",
-    domain: "ml",
-    level: :intermediate,
-    tags: ["feature-store", "features", "online", "offline"],
-    format: :mermaid,
-    diagram_source: """
-    flowchart LR
-      RAW[Raw Events & Batch Data] --> FB[Feature Building Jobs]
-      FB --> OFS[(Offline Feature Store)]
-      FB --> ONFS[(Online Feature Store)]
-
-      OFS --> TR[Training Jobs]
-      ONFS --> INF[Online Inference Services]
-    """,
-    summary: "Explains the role of online and offline feature stores in ML systems.",
-    notes_md: """
-    - Offline store holds historical features for training and backtesting.
-    - Online store serves low-latency features for real-time predictions.
-    - Feature building jobs write to both stores to keep them consistent.
-    """
-  },
-  %{
-    title: "LLM Tool-Calling Workflow for Operations",
-    slug: "llm-tool-calling-workflow-operations",
-    domain: "ml",
-    level: :advanced,
-    tags: ["llm", "tool-calling", "operations", "agents"],
-    format: :mermaid,
-    diagram_source: """
-    sequenceDiagram
-      participant U as User / Service
-      participant L as LLM
-      participant T1 as Tool: GetOrderStatus
-      participant T2 as Tool: GetRates
-
-      U->>L: Natural-language request
-      L-->>L: Decide tools to call
-
-      L->>T1: tool_call(order_id)
-      T1-->>L: order_status
-
-      L->>T2: tool_call(origin, destination, dims)
-      T2-->>L: rate_options
-
-      L-->>U: Final structured response<br/>(status + best route)
-    """,
-    summary: "Demonstrates how an LLM orchestrates multiple tools to answer an operational request.",
-    notes_md: """
-    - LLM interprets user intent and selects tools to call.
-    - Tools encapsulate deterministic business logic and data access.
-    - LLM combines tool outputs into a final answer or decision.
-    - This pattern is useful for conversational operational assistants.
-    """
-  },
-  %{
-    title: "Multi-Layer Fallback: Cache → Edge → Cloud",
-    slug: "multi-layer-fallback-cache-edge-cloud",
-    domain: "infra",
-    level: :intermediate,
-    tags: ["fallback", "cache", "edge", "cloud"],
-    format: :mermaid,
-    diagram_source: """
-    flowchart TD
-      R[Request for Prediction] --> C[(Local Cache)]
-      C -->|hit| RC[Return Cached]
-      C -->|miss| E[Edge Inference]
-
-      E -->|success| RE[Return Edge Result]
-      E -->|failure/unsupported| CL[Cloud Inference]
-
-      CL -->|success| RCL[Return Cloud Result]
-      CL -->|failure| FH[Fallback Heuristic / Default]
-    """,
-    summary: "Shows a layered fallback strategy for predictions: cache, edge, and cloud inference.",
-    notes_md: """
-    - Check cache first for fastest response.
-    - Use edge inference when possible for low latency.
-    - Cloud inference provides the most capable models when edge is insufficient.
-    - Final heuristic or default protects against full-stack failure.
-    """
-  }
-]
-
-# Insert diagrams
-IO.puts("Inserting #{length(diagrams_data)} diagrams...")
-
-Enum.zip(concepts, diagrams_data)
-|> Enum.each(fn {concept, diagram_attrs} ->
+# Helper function to create diagrams for a concept
+create_diagram = fn concept_id, title, domain, tags, mermaid, summary, notes ->
   %Diagram{}
-  |> Diagram.changeset(
-    diagram_attrs
-    |> Map.put(:concept_id, concept.id)
-    |> Map.put(:document_id, document.id)
-  )
+  |> Diagram.changeset(%{
+    concept_id: concept_id,
+    document_id: document.id,
+    slug: generate_slug.(title),
+    title: title,
+    domain: domain,
+    tags: tags,
+    diagram_source: mermaid,
+    summary: summary,
+    notes_md: notes
+  })
   |> Repo.insert!()
+end
+
+# Get concepts by name for easier reference
+genserver_concept = Enum.find(concepts, &(&1.name == "GenServer Patterns"))
+supervision_concept = Enum.find(concepts, &(&1.name == "OTP Supervision"))
+kafka_concept = Enum.find(concepts, &(&1.name == "Event-Driven Processing"))
+ml_concept = Enum.find(concepts, &(&1.name == "ML Model Serving"))
+postgres_concept = Enum.find(concepts, &(&1.name == "Database Optimization"))
+infra_concept = Enum.find(concepts, &(&1.name == "Distributed System Infrastructure"))
+
+IO.puts("Creating diagrams for each concept...")
+
+# GenServer Patterns diagrams (4 diagrams)
+create_diagram.(
+  genserver_concept.id,
+  "GenServer Call vs Cast",
+  "elixir",
+  ["genserver", "concurrency", "otp"],
+  """
+  sequenceDiagram
+      participant C as Client
+      participant G as GenServer
+      C->>+G: call(:get_state)
+      G-->>-C: {:ok, state}
+      Note over C,G: Synchronous - blocks client
+      C-)+G: cast(:update, val)
+      Note over G: Asynchronous - returns immediately
+      G->>G: handle_cast
+      Note over G: Updates state without reply
+  """,
+  "Compares synchronous GenServer.call/3 which blocks the caller until a reply is received, versus asynchronous GenServer.cast/2 which returns immediately without waiting.",
+  """
+  - `call/3` blocks the caller and expects a reply
+  - `cast/2` fires and forgets, useful for updates that don't need confirmation
+  - Use call for queries, cast for commands that don't need acknowledgment
+  - Calls can timeout if the GenServer is busy
+  """
+)
+
+create_diagram.(
+  genserver_concept.id,
+  "GenServer State Management",
+  "elixir",
+  ["genserver", "state", "functional"],
+  """
+  flowchart TD
+      A[Client Request] --> B{handle_call/3}
+      B --> C[Read Current State]
+      C --> D[Compute New State]
+      D --> E[Return Reply + New State]
+      E --> F[GenServer updates state]
+      F --> G[Ready for next request]
+  """,
+  "Shows how GenServer maintains state immutably by returning new state from each callback.",
+  """
+  - State is passed as the last argument to callbacks
+  - Callbacks return `{:reply, response, new_state}` or `{:noreply, new_state}`
+  - State transformations are pure functions
+  - Old state is garbage collected after callback returns
+  """
+)
+
+create_diagram.(
+  genserver_concept.id,
+  "GenServer Timeout Patterns",
+  "elixir",
+  ["genserver", "timeout", "reliability"],
+  """
+  sequenceDiagram
+      participant C as Client
+      participant G as GenServer
+      C->>+G: call(:slow_operation, 5000)
+      Note over G: Processing...
+      alt Completes in time
+          G-->>-C: {:ok, result}
+      else Timeout after 5s
+          G--xC: :timeout error
+          Note over C: Client can retry or fail gracefully
+      end
+  """,
+  "Demonstrates timeout handling in GenServer calls to prevent indefinite blocking.",
+  """
+  - Default timeout is 5 seconds
+  - Can specify custom timeout: `GenServer.call(pid, :msg, 10_000)`
+  - Server continues processing even after timeout
+  - Client should handle `:timeout` error appropriately
+  """
+)
+
+create_diagram.(
+  genserver_concept.id,
+  "GenServer Initialization Flow",
+  "elixir",
+  ["genserver", "initialization", "otp"],
+  """
+  sequenceDiagram
+      participant S as Supervisor
+      participant G as GenServer
+      participant D as Database
+      S->>+G: start_link(args)
+      G->>G: init(args)
+      G->>D: Load initial data
+      D-->>G: Data
+      alt Initialization succeeds
+          G-->>-S: {:ok, pid}
+          Note over S: Child added to supervisor
+      else Initialization fails
+          G--xS: {:error, reason}
+          Note over S: Supervisor may retry based on strategy
+      end
+  """,
+  "Shows the GenServer initialization sequence and how failures are handled during startup.",
+  """
+  - `init/1` is called synchronously during `start_link`
+  - Heavy initialization work blocks supervisor startup
+  - Use `{:continue, work}` to defer heavy work to `handle_continue/2`
+  - Return `{:stop, reason}` to prevent server from starting
+  """
+)
+
+# OTP Supervision diagrams (3 diagrams)
+create_diagram.(
+  supervision_concept.id,
+  "Supervision Tree Structure",
+  "elixir",
+  ["supervisor", "otp", "architecture"],
+  """
+  flowchart TD
+      A[Application] --> B[Top Supervisor]
+      B --> C[Cache Manager]
+      B --> D[Worker Supervisor]
+      B --> E[Database Pool]
+      D --> F[Worker 1]
+      D --> G[Worker 2]
+      D --> H[Worker 3]
+      style B fill:#4a5568
+      style D fill:#4a5568
+  """,
+  "Illustrates a typical OTP supervision tree with multiple levels of supervisors organizing workers.",
+  """
+  - Supervisors form a tree structure
+  - Each supervisor manages its immediate children
+  - Workers are leaf nodes (GenServers, Tasks, etc.)
+  - Supervisors can supervise other supervisors
+  """
+)
+
+create_diagram.(
+  supervision_concept.id,
+  "Supervisor Restart Strategies",
+  "elixir",
+  ["supervisor", "fault-tolerance", "strategies"],
+  """
+  flowchart LR
+      A[Child Crashes] --> B{Restart Strategy}
+      B -->|one_for_one| C[Restart only crashed child]
+      B -->|one_for_all| D[Restart all children]
+      B -->|rest_for_one| E[Restart crashed + children started after it]
+      style B fill:#d69e2e
+  """,
+  "Compares the three main supervisor restart strategies and when each crashed child triggers restarts.",
+  """
+  - `:one_for_one` - Only restart the crashed process (most common)
+  - `:one_for_all` - Restart all children if any crashes (use when dependent)
+  - `:rest_for_one` - Restart crashed child and all started after it (ordered dependencies)
+  - Choose based on dependencies between children
+  """
+)
+
+create_diagram.(
+  supervision_concept.id,
+  "Process Crash and Restart Flow",
+  "elixir",
+  ["supervisor", "crash", "restart"],
+  """
+  sequenceDiagram
+      participant S as Supervisor
+      participant W as Worker
+      participant N as New Worker
+      W->>W: Crash!
+      W--xS: :EXIT signal
+      Note over S: Detects child exit
+      S->>S: Check restart strategy
+      alt Under max_restarts threshold
+          S->>+N: start_link(args)
+          N-->>-S: {:ok, pid}
+          Note over S: Worker restored
+      else Exceeded max_restarts
+          S->>S: Shutdown
+          S-->>App: Escalate to parent supervisor
+      end
+  """,
+  "Shows how supervisors detect crashes and restart workers, with escalation if restarts exceed limits.",
+  """
+  - Supervisor monitors all children via process links
+  - Receives `:EXIT` signal when child crashes
+  - Attempts restart based on strategy
+  - If `max_restarts` exceeded in `max_seconds`, supervisor shuts down
+  """
+)
+
+# Event-Driven Processing diagrams (4 diagrams)
+create_diagram.(
+  kafka_concept.id,
+  "Kafka Topic and Consumer Groups",
+  "kafka",
+  ["kafka", "messaging", "streaming"],
+  """
+  flowchart LR
+      P[Producer] --> T[Topic: orders]
+      T --> |Partition 0| C1[Consumer A - Group 1]
+      T --> |Partition 1| C2[Consumer B - Group 1]
+      T --> |Partition 2| C3[Consumer C - Group 1]
+      T --> |All Partitions| C4[Consumer - Group 2]
+      style T fill:#d69e2e
+  """,
+  "Shows how Kafka topics with multiple partitions distribute messages across consumers in a group.",
+  """
+  - Each partition is consumed by one consumer in a group
+  - Multiple consumer groups can read the same topic independently
+  - Partitions enable parallel processing
+  - Kafka tracks offset per consumer group per partition
+  """
+)
+
+create_diagram.(
+  kafka_concept.id,
+  "Broadway Pipeline Processing",
+  "kafka",
+  ["broadway", "elixir", "pipeline"],
+  """
+  flowchart LR
+      K[Kafka] --> P[Producer]
+      P --> B1[Batch 1]
+      P --> B2[Batch 2]
+      P --> B3[Batch 3]
+      B1 --> Proc1[Process]
+      B2 --> Proc2[Process]
+      B3 --> Proc3[Process]
+      Proc1 --> Ack[Acknowledge]
+      Proc2 --> Ack
+      Proc3 --> Ack
+      style P fill:#4a5568
+      style Ack fill:#48bb78
+  """,
+  "Illustrates Broadway's concurrent batch processing pipeline for consuming Kafka events.",
+  """
+  - Broadway manages concurrent processors
+  - Events are batched automatically
+  - Built-in backpressure prevents overload
+  - Acknowledgments are handled automatically
+  """
+)
+
+create_diagram.(
+  kafka_concept.id,
+  "Event Sourcing Pattern",
+  "kafka",
+  ["event-sourcing", "cqrs", "architecture"],
+  """
+  flowchart TD
+      C[Command] --> A[Aggregate]
+      A --> E1[Event 1]
+      A --> E2[Event 2]
+      E1 --> ES[Event Store/Kafka]
+      E2 --> ES
+      ES --> P1[Projection 1: Read Model]
+      ES --> P2[Projection 2: Analytics]
+      ES --> P3[Projection 3: Notifications]
+      style ES fill:#d69e2e
+  """,
+  "Shows how event sourcing stores all state changes as events, which are then projected into different read models.",
+  """
+  - All state changes are captured as immutable events
+  - Events are the source of truth
+  - Multiple projections create different views of the data
+  - Can replay events to rebuild state or create new projections
+  """
+)
+
+create_diagram.(
+  kafka_concept.id,
+  "At-Least-Once Delivery Semantics",
+  "kafka",
+  ["kafka", "reliability", "delivery"],
+  """
+  sequenceDiagram
+      participant K as Kafka
+      participant C as Consumer
+      participant DB as Database
+      K->>+C: Message 1
+      C->>DB: Process & Store
+      DB-->>C: Success
+      C->>K: Commit Offset
+      Note over K,C: Happy path
+      K->>+C: Message 2
+      C->>DB: Process & Store
+      DB--xC: Failure
+      Note over C: Don't commit offset
+      C->>C: Retry
+      C->>DB: Process & Store (duplicate)
+      DB-->>C: Success
+      C->>K: Commit Offset
+  """,
+  "Demonstrates Kafka's at-least-once delivery where messages may be reprocessed on failure.",
+  """
+  - Consumer commits offset only after successful processing
+  - On failure, message is redelivered from last committed offset
+  - Processing must be idempotent to handle duplicates
+  - Use unique IDs to detect and skip duplicate messages
+  """
+)
+
+# ML Model Serving diagrams (5 diagrams)
+create_diagram.(
+  ml_concept.id,
+  "Two-Tier Caching Strategy",
+  "ml",
+  ["caching", "ets", "redis"],
+  """
+  flowchart TD
+      R[Request] --> E{ETS Cache Hit?}
+      E -->|Yes| RE1[Return from ETS]
+      E -->|No| R1{Redis Cache Hit?}
+      R1 -->|Yes| RE2[Return from Redis + Update ETS]
+      R1 -->|No| ML[Call ML Model]
+      ML --> U[Update Redis + ETS]
+      U --> RET[Return Prediction]
+      style E fill:#48bb78
+      style R1 fill:#ed8936
+      style ML fill:#e53e3e
+  """,
+  "Shows a two-level caching strategy using fast ETS for hot data and Redis for shared cache across nodes.",
+  """
+  - ETS provides in-memory cache within a single node (microseconds)
+  - Redis provides shared cache across nodes (milliseconds)
+  - ML inference is slowest fallback (hundreds of milliseconds)
+  - Cache keys should include feature versions to avoid stale predictions
+  """
+)
+
+create_diagram.(
+  ml_concept.id,
+  "Circuit Breaker for ML Service",
+  "ml",
+  ["circuit-breaker", "reliability", "resilience"],
+  """
+  stateDiagram-v2
+      [*] --> Closed
+      Closed --> Open: Failures exceed threshold
+      Open --> HalfOpen: After timeout
+      HalfOpen --> Closed: Success
+      HalfOpen --> Open: Failure
+      note right of Closed: All requests pass through
+      note right of Open: Fail fast, return fallback
+      note right of HalfOpen: Test with limited requests
+  """,
+  "Circuit breaker pattern prevents cascading failures when ML service is down by failing fast after detecting issues.",
+  """
+  - **Closed**: Normal operation, requests flow through
+  - **Open**: Too many failures, reject requests immediately with fallback
+  - **Half-Open**: After cooldown, test if service recovered
+  - Prevents overwhelming a failing service with requests
+  """
+)
+
+create_diagram.(
+  ml_concept.id,
+  "Edge vs Cloud Inference Trade-offs",
+  "ml",
+  ["edge", "cloud", "architecture"],
+  """
+  flowchart LR
+      R[Request] --> D{Latency Critical?}
+      D -->|Yes| Edge[Edge Inference]
+      D -->|No| Cloud[Cloud Inference]
+      Edge --> E1[Lower Latency<br/>Limited Model Size<br/>Higher Cost per Node]
+      Cloud --> C1[Higher Latency<br/>Larger Models<br/>Lower Cost at Scale]
+      style Edge fill:#48bb78
+      style Cloud fill:#4299e1
+  """,
+  "Compares edge inference (on-device/gateway) versus cloud inference for ML model serving.",
+  """
+  - **Edge**: <100ms latency, smaller models, higher infra cost
+  - **Cloud**: 200-500ms latency, larger models, economies of scale
+  - Use edge for real-time decisions (fraud detection, routing)
+  - Use cloud for batch processing or when model size matters
+  """
+)
+
+create_diagram.(
+  ml_concept.id,
+  "Model Lifecycle Management",
+  "ml",
+  ["mlops", "lifecycle", "deployment"],
+  """
+  flowchart TD
+      D[Data Collection] --> T[Training]
+      T --> V[Validation]
+      V --> R{Metrics OK?}
+      R -->|No| T
+      R -->|Yes| Deploy[Deploy to Staging]
+      Deploy --> AB[A/B Test]
+      AB --> Prod[Production Rollout]
+      Prod --> M[Monitor Metrics]
+      M --> |Drift Detected| D
+      style M fill:#ed8936
+  """,
+  "End-to-end ML model lifecycle from training through deployment and monitoring for drift.",
+  """
+  - Models degrade over time as data distributions shift
+  - Monitor prediction accuracy, latency, and feature drift
+  - Retrain periodically or when metrics degrade
+  - Use A/B testing before full production rollout
+  """
+)
+
+create_diagram.(
+  ml_concept.id,
+  "Feature Store Architecture",
+  "ml",
+  ["features", "ml", "data"],
+  """
+  flowchart LR
+      subgraph Online
+      A[API Request] --> O[Online Store<br/>Redis/DynamoDB]
+      O --> I[Inference]
+      end
+      subgraph Offline
+      B[Batch Jobs] --> OF[Offline Store<br/>S3/BigQuery]
+      OF --> T[Training]
+      end
+      D[Data Pipeline] --> O
+      D --> OF
+      style O fill:#48bb78
+      style OF fill:#4299e1
+  """,
+  "Feature store separates online (low-latency) and offline (batch) feature serving for ML.",
+  """
+  - **Online Store**: Fast lookup for real-time inference (Redis, DynamoDB)
+  - **Offline Store**: Historical features for training (S3, BigQuery)
+  - Ensures training/serving consistency
+  - Reduces feature engineering duplication across teams
+  """
+)
+
+# Database Optimization diagrams (3 diagrams)
+create_diagram.(
+  postgres_concept.id,
+  "PostgreSQL Index Types",
+  "postgres",
+  ["indexing", "performance", "database"],
+  """
+  flowchart TD
+      Q[Query] --> I{Index Type}
+      I -->|BTREE| B[Equality & Range<br/>WHERE id = 5<br/>WHERE age > 18]
+      I -->|HASH| H[Equality Only<br/>WHERE email = 'x@y.com']
+      I -->|GIN| G[Full-text Search<br/>Array Containment<br/>JSONB queries]
+      I -->|GIST| GI[Geometric Data<br/>Full-text Search<br/>Range Types]
+      style I fill:#d69e2e
+  """,
+  "Compares PostgreSQL index types and their ideal use cases for query optimization.",
+  """
+  - **BTREE**: Default, best for equality and range queries
+  - **HASH**: Faster equality checks, no range support
+  - **GIN**: JSONB, arrays, full-text search
+  - **GIST**: Geometric data, IP ranges, full-text
+  """
+)
+
+create_diagram.(
+  postgres_concept.id,
+  "Query Optimization with EXPLAIN",
+  "postgres",
+  ["explain", "query-planning", "optimization"],
+  """
+  flowchart TD
+      Q[Slow Query] --> E[EXPLAIN ANALYZE]
+      E --> R{Findings}
+      R --> S1[Sequential Scan]
+      R --> S2[Hash Join Cost High]
+      R --> S3[Sort Operation Expensive]
+      S1 --> F1[Add Index]
+      S2 --> F2[Increase work_mem]
+      S3 --> F3[Add ORDER BY index]
+      F1 --> T[Test Again]
+      F2 --> T
+      F3 --> T
+      style E fill:#d69e2e
+  """,
+  "Workflow for diagnosing and fixing slow queries using PostgreSQL's EXPLAIN ANALYZE.",
+  """
+  - `EXPLAIN` shows query plan without execution
+  - `EXPLAIN ANALYZE` runs query and shows actual times
+  - Look for Seq Scans on large tables (add index)
+  - Check join costs (consider statistics update or index)
+  """
+)
+
+create_diagram.(
+  postgres_concept.id,
+  "Table Partitioning Strategy",
+  "postgres",
+  ["partitioning", "scaling", "performance"],
+  """
+  flowchart TD
+      T[Large Table: events<br/>100M+ rows] --> P[Partition by Date]
+      P --> P1[events_2024_01]
+      P --> P2[events_2024_02]
+      P --> P3[events_2024_03]
+      Q[Query: WHERE date = '2024-02'<br/>AND user_id = 123] --> PP[Partition Pruning]
+      PP --> P2
+      style PP fill:#48bb78
+  """,
+  "Shows how table partitioning improves query performance by pruning irrelevant partitions.",
+  """
+  - Partition large tables by time, geography, or category
+  - Queries with partition key only scan relevant partitions
+  - Easier maintenance (drop old partitions vs DELETE)
+  - Partitioning by month/week common for time-series data
+  """
+)
+
+# Infrastructure diagrams (4 diagrams)
+create_diagram.(
+  infra_concept.id,
+  "Observability Pipeline",
+  "infrastructure",
+  ["observability", "monitoring", "logs"],
+  """
+  flowchart LR
+      A[Application] --> L[Logs]
+      A --> M[Metrics]
+      A --> T[Traces]
+      L --> F[Fluentd/Logstash]
+      M --> P[Prometheus]
+      T --> J[Jaeger]
+      F --> E[Elasticsearch]
+      P --> G[Grafana]
+      J --> G
+      E --> G
+      style G fill:#d69e2e
+  """,
+  "Standard observability stack collecting logs, metrics, and traces into unified dashboards.",
+  """
+  - **Logs**: Structured events (Fluentd → Elasticsearch)
+  - **Metrics**: Time-series data (Prometheus → Grafana)
+  - **Traces**: Request flows (Jaeger → Grafana)
+  - Correlate using trace IDs across all three
+  """
+)
+
+create_diagram.(
+  infra_concept.id,
+  "Autoscaling Based on Metrics",
+  "infrastructure",
+  ["autoscaling", "kubernetes", "scaling"],
+  """
+  flowchart TD
+      M[Metrics: CPU, Latency, Queue Depth] --> HPA[Horizontal Pod Autoscaler]
+      HPA --> D{Current vs Target}
+      D -->|Above Target| U[Scale Up Pods]
+      D -->|Below Target| Down[Scale Down Pods]
+      D -->|Within Range| N[No Action]
+      U --> W[Wait for Cooldown]
+      Down --> W
+      style HPA fill:#4299e1
+  """,
+  "Kubernetes HPA automatically adjusts pod count based on observed metrics like CPU or custom metrics.",
+  """
+  - Monitor CPU, memory, or custom metrics (e.g., queue length)
+  - Scale up when metrics exceed target for sustained period
+  - Scale down when metrics below target (with longer cooldown)
+  - Set min/max pod limits to control costs
+  """
+)
+
+create_diagram.(
+  infra_concept.id,
+  "Multi-Layer Fallback Architecture",
+  "infrastructure",
+  ["resilience", "fallback", "architecture"],
+  """
+  flowchart TD
+      R[Request] --> L1{Local Cache}
+      L1 -->|Hit| R1[Return Cached]
+      L1 -->|Miss| L2{Edge Service}
+      L2 -->|Available| R2[Return from Edge]
+      L2 -->|Down| L3{Cloud Service}
+      L3 -->|Available| R3[Return from Cloud]
+      L3 -->|Down| F[Static Fallback/Error]
+      style L1 fill:#48bb78
+      style L2 fill:#ed8936
+      style L3 fill:#e53e3e
+  """,
+  "Cascading fallback strategy across multiple service tiers for high availability.",
+  """
+  - Layer 1: Local cache (fastest, most reliable)
+  - Layer 2: Edge service (fast, regional)
+  - Layer 3: Cloud service (slower, centralized)
+  - Layer 4: Static fallback (degraded experience)
+  """
+)
+
+create_diagram.(
+  infra_concept.id,
+  "Rate Limiting with Token Bucket",
+  "infrastructure",
+  ["rate-limiting", "api", "throttling"],
+  """
+  flowchart TD
+      R[Request] --> B{Bucket Has Tokens?}
+      B -->|Yes| C[Consume Token]
+      C --> P[Process Request]
+      B -->|No| Reject[Reject with 429]
+      T[Token Refill:<br/>+X tokens per second] --> Bu[Bucket]
+      Bu --> B
+      style B fill:#d69e2e
+      style Reject fill:#e53e3e
+  """,
+  "Token bucket algorithm for rate limiting API requests, allowing bursts while enforcing average rate.",
+  """
+  - Bucket starts with N tokens
+  - Each request consumes 1 token
+  - Tokens refill at steady rate (e.g., 10/sec)
+  - Allows bursts up to bucket capacity
+  """
+)
+
+IO.puts("Diagrams created successfully!")
+
+# Print summary
+total_diagrams = Repo.aggregate(Diagram, :count, :id)
+IO.puts("✓ Created #{length(concepts)} concepts with #{total_diagrams} total diagrams")
+
+Enum.each(concepts, fn concept ->
+  count = Repo.aggregate(
+    from(d in Diagram, where: d.concept_id == ^concept.id),
+    :count,
+    :id
+  )
+  IO.puts("  - #{concept.name} (#{concept.category}): #{count} diagrams")
 end)
-
-IO.puts("Diagrams created successfully")
-
-IO.puts("""
-
-✅ Seed complete!
-
-Summary:
-- 1 document created
-- #{length(concepts)} concepts created
-- #{length(diagrams_data)} diagrams created
-
-All concepts and diagrams are linked to the seed document.
-""")

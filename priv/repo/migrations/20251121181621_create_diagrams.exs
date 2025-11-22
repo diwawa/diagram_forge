@@ -8,7 +8,6 @@ defmodule DiagramForge.Repo.Migrations.CreateDiagrams do
       add :slug, :string, null: false
       add :title, :string, null: false
       add :domain, :string
-      add :level, :string, null: false, default: "beginner"
       add :tags, {:array, :string}, default: []
       add :format, :string, null: false, default: "mermaid"
       add :diagram_source, :text, null: false

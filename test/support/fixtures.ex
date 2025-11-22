@@ -44,9 +44,7 @@ defmodule DiagramForge.Fixtures do
         document_id: document.id,
         name: "Test Concept #{System.unique_integer([:positive])}",
         short_description: "A test concept for testing purposes",
-        category: "elixir",
-        level: :beginner,
-        importance: 3
+        category: "elixir"
       })
     )
   end
@@ -59,7 +57,6 @@ defmodule DiagramForge.Fixtures do
       slug: "test-diagram-#{System.unique_integer([:positive])}",
       title: "Test Diagram #{System.unique_integer([:positive])}",
       domain: "elixir",
-      level: :beginner,
       tags: ["test"],
       format: :mermaid,
       diagram_source: "flowchart TD\n  A[Start] --> B[End]",

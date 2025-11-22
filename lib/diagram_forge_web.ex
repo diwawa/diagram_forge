@@ -86,6 +86,8 @@ defmodule DiagramForgeWeb do
       import Phoenix.HTML
       # Core UI components
       import DiagramForgeWeb.CoreComponents
+      # Helper functions
+      import DiagramForgeWeb.Helpers
 
       # Common modules used in templates
       alias DiagramForgeWeb.Layouts

@@ -17,7 +17,6 @@ defmodule DiagramForge.Diagrams.DiagramGeneratorTest do
       ai_response = %{
         "title" => "GenServer Message Flow",
         "domain" => "elixir",
-        "level" => "intermediate",
         "tags" => ["otp", "concurrency"],
         "mermaid" => "flowchart TD\n  A[Client] --> B[GenServer]",
         "summary" => "Shows how GenServer handles messages",
@@ -33,7 +32,6 @@ defmodule DiagramForge.Diagrams.DiagramGeneratorTest do
 
       assert diagram.title == "GenServer Message Flow"
       assert diagram.domain == "elixir"
-      assert diagram.level == :intermediate
       assert diagram.tags == ["otp", "concurrency"]
       assert diagram.format == :mermaid
       assert diagram.diagram_source == "flowchart TD\n  A[Client] --> B[GenServer]"
@@ -48,7 +46,6 @@ defmodule DiagramForge.Diagrams.DiagramGeneratorTest do
       ai_response = %{
         "title" => "Test Diagram",
         "domain" => "test",
-        "level" => "beginner",
         "tags" => [],
         "mermaid" => "graph TD\n  A --> B",
         "summary" => "Test summary",
@@ -78,7 +75,6 @@ defmodule DiagramForge.Diagrams.DiagramGeneratorTest do
       ai_response = %{
         "title" => "GenServer Message Flow Diagram",
         "domain" => "elixir",
-        "level" => "beginner",
         "tags" => [],
         "mermaid" => "graph TD\n  A --> B",
         "summary" => "Summary",
@@ -103,7 +99,7 @@ defmodule DiagramForge.Diagrams.DiagramGeneratorTest do
         "title" => "Test Diagram",
         "domain" => "test",
         "mermaid" => "graph TD\n  A --> B"
-        # Missing level, tags, summary, notes_md
+        # Missing tags, summary, notes_md
       }
 
       expect(MockAIClient, :chat!, fn _messages, _opts ->
@@ -113,36 +109,9 @@ defmodule DiagramForge.Diagrams.DiagramGeneratorTest do
       assert {:ok, diagram} =
                DiagramGenerator.generate_for_concept(concept, ai_client: MockAIClient)
 
-      assert diagram.level == :beginner
       assert diagram.tags == []
       assert is_nil(diagram.summary)
       assert is_nil(diagram.notes_md)
-    end
-
-    test "properly converts level string to atom" do
-      document = fixture(:document, raw_text: "Content")
-      concept = fixture(:concept, document: document)
-
-      for level <- ["beginner", "intermediate", "advanced"] do
-        ai_response = %{
-          "title" => "Test Diagram #{level}",
-          "domain" => "test",
-          "level" => level,
-          "tags" => [],
-          "mermaid" => "graph TD\n  A --> B",
-          "summary" => "Summary",
-          "notes_md" => "Notes"
-        }
-
-        expect(MockAIClient, :chat!, fn _messages, _opts ->
-          Jason.encode!(ai_response)
-        end)
-
-        assert {:ok, diagram} =
-                 DiagramGenerator.generate_for_concept(concept, ai_client: MockAIClient)
-
-        assert diagram.level == String.to_existing_atom(level)
-      end
     end
 
     test "builds context excerpt from document" do
@@ -155,7 +124,6 @@ defmodule DiagramForge.Diagrams.DiagramGeneratorTest do
       ai_response = %{
         "title" => "Test Diagram",
         "domain" => "test",
-        "level" => "beginner",
         "tags" => [],
         "mermaid" => "graph TD\n  A --> B",
         "summary" => "Summary",
@@ -183,7 +151,6 @@ defmodule DiagramForge.Diagrams.DiagramGeneratorTest do
       ai_response = %{
         "title" => "Test Diagram",
         "domain" => "test",
-        "level" => "beginner",
         "tags" => [],
         "mermaid" => "graph TD\n  A --> B",
         "summary" => "Summary",
@@ -206,7 +173,6 @@ defmodule DiagramForge.Diagrams.DiagramGeneratorTest do
       ai_response = %{
         "title" => "Test Architecture",
         "domain" => "system-design",
-        "level" => "advanced",
         "tags" => ["architecture", "microservices"],
         "mermaid" => "graph LR\n  A[Frontend] --> B[API]\n  B --> C[Database]",
         "summary" => "High-level architecture overview",
@@ -224,7 +190,6 @@ defmodule DiagramForge.Diagrams.DiagramGeneratorTest do
 
       assert diagram.title == "Test Architecture"
       assert diagram.domain == "system-design"
-      assert diagram.level == :advanced
       assert diagram.tags == ["architecture", "microservices"]
       assert diagram.format == :mermaid
       assert diagram.diagram_source == "graph LR\n  A[Frontend] --> B[API]\n  B --> C[Database]"
@@ -236,7 +201,6 @@ defmodule DiagramForge.Diagrams.DiagramGeneratorTest do
       ai_response = %{
         "title" => "Test Diagram",
         "domain" => "test",
-        "level" => "beginner",
         "tags" => [],
         "mermaid" => "graph TD\n  A --> B",
         "summary" => "Summary",
@@ -260,7 +224,6 @@ defmodule DiagramForge.Diagrams.DiagramGeneratorTest do
       ai_response = %{
         "title" => "OAuth 2.0 Flow Diagram",
         "domain" => "security",
-        "level" => "intermediate",
         "tags" => [],
         "mermaid" => "sequenceDiagram\n  A->>B: Request",
         "summary" => "Summary",
@@ -284,7 +247,7 @@ defmodule DiagramForge.Diagrams.DiagramGeneratorTest do
         "title" => "Minimal Diagram",
         "domain" => "test",
         "mermaid" => "graph TD\n  A --> B"
-        # Missing level, tags, summary, notes_md
+        # Missing tags, summary, notes_md
       }
 
       expect(MockAIClient, :chat!, fn _messages, _opts ->
@@ -294,7 +257,6 @@ defmodule DiagramForge.Diagrams.DiagramGeneratorTest do
       assert {:ok, diagram} =
                DiagramGenerator.generate_from_prompt("Create diagram", ai_client: MockAIClient)
 
-      assert diagram.level == :beginner
       assert diagram.tags == []
       assert is_nil(diagram.summary)
       assert is_nil(diagram.notes_md)
@@ -304,7 +266,6 @@ defmodule DiagramForge.Diagrams.DiagramGeneratorTest do
       ai_response = %{
         "title" => nil,
         "domain" => "test",
-        "level" => "beginner",
         "tags" => [],
         "mermaid" => "graph TD\n  A --> B",
         "summary" => "Summary",
@@ -320,31 +281,6 @@ defmodule DiagramForge.Diagrams.DiagramGeneratorTest do
 
       assert "can't be blank" in errors_on(changeset).title
     end
-
-    test "properly converts level string to atom" do
-      for level <- ["beginner", "intermediate", "advanced"] do
-        ai_response = %{
-          "title" => "Test Diagram #{level}",
-          "domain" => "test",
-          "level" => level,
-          "tags" => [],
-          "mermaid" => "graph TD\n  A --> B",
-          "summary" => "Summary",
-          "notes_md" => "Notes"
-        }
-
-        expect(MockAIClient, :chat!, fn _messages, _opts ->
-          Jason.encode!(ai_response)
-        end)
-
-        assert {:ok, diagram} =
-                 DiagramGenerator.generate_from_prompt("Create diagram",
-                   ai_client: MockAIClient
-                 )
-
-        assert diagram.level == String.to_existing_atom(level)
-      end
-    end
   end
 
   describe "slug generation" do
@@ -355,7 +291,6 @@ defmodule DiagramForge.Diagrams.DiagramGeneratorTest do
       ai_response = %{
         "title" => "GenServer Supervisor Tree",
         "domain" => "elixir",
-        "level" => "beginner",
         "tags" => [],
         "mermaid" => "graph TD\n  A --> B",
         "summary" => "Summary",
@@ -379,7 +314,6 @@ defmodule DiagramForge.Diagrams.DiagramGeneratorTest do
       ai_response = %{
         "title" => "HTTP/2 vs HTTP/1.1 Comparison!",
         "domain" => "networking",
-        "level" => "beginner",
         "tags" => [],
         "mermaid" => "graph TD\n  A --> B",
         "summary" => "Summary",
@@ -403,7 +337,6 @@ defmodule DiagramForge.Diagrams.DiagramGeneratorTest do
       ai_response = %{
         "title" => "---Test Diagram---",
         "domain" => "test",
-        "level" => "beginner",
         "tags" => [],
         "mermaid" => "graph TD\n  A --> B",
         "summary" => "Summary",

@@ -17,8 +17,6 @@ defmodule DiagramForge.Diagrams.Diagram do
     field :title, :string
 
     field :domain, :string
-    field :level, Ecto.Enum, values: [:beginner, :intermediate, :advanced], default: :beginner
-
     field :tags, {:array, :string}, default: []
 
     field :format, Ecto.Enum, values: [:mermaid, :plantuml], default: :mermaid
@@ -37,7 +35,6 @@ defmodule DiagramForge.Diagrams.Diagram do
       :slug,
       :title,
       :domain,
-      :level,
       :tags,
       :format,
       :diagram_source,
