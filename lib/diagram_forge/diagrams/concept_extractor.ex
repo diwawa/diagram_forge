@@ -5,6 +5,8 @@ defmodule DiagramForge.Diagrams.ConceptExtractor do
 
   require Logger
 
+  import Ecto.Query
+
   alias DiagramForge.AI.Client
   alias DiagramForge.AI.Prompts
   alias DiagramForge.Diagrams.{Concept, Document, DocumentIngestor}
@@ -101,21 +103,34 @@ defmodule DiagramForge.Diagrams.ConceptExtractor do
   end
 
   defp insert_or_update_concept(doc, attrs) do
+    # Look up concept globally by name (case-insensitive)
+    name = attrs["name"]
+
     existing =
-      Repo.get_by(Concept,
-        document_id: doc.id,
-        name: attrs["name"]
+      Repo.one(
+        from c in Concept,
+          where: fragment("LOWER(?)", c.name) == ^String.downcase(name),
+          limit: 1
       )
 
-    params = %{
-      document_id: doc.id,
-      name: attrs["name"],
-      short_description: attrs["short_description"],
-      category: attrs["category"]
-    }
-
-    (existing || %Concept{})
-    |> Concept.changeset(params)
-    |> Repo.insert_or_update!()
+    if existing do
+      # Concept already exists globally, update it with new information
+      existing
+      |> Concept.changeset(%{
+        short_description: attrs["short_description"],
+        category: attrs["category"]
+      })
+      |> Repo.update!()
+    else
+      # Create new concept with this document as its origin
+      %Concept{}
+      |> Concept.changeset(%{
+        document_id: doc.id,
+        name: name,
+        short_description: attrs["short_description"],
+        category: attrs["category"]
+      })
+      |> Repo.insert!()
+    end
   end
 end

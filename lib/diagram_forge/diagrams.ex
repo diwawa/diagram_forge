@@ -142,7 +142,13 @@ defmodule DiagramForge.Diagrams do
   defp maybe_filter_by_document(query, nil), do: query
 
   defp maybe_filter_by_document(query, document_id) do
-    from c in query, where: c.document_id == ^document_id
+    # Filter by either:
+    # 1. Concepts that originated from this document (document_id set), OR
+    # 2. Concepts that have diagrams for this document
+    from c in query,
+      left_join: d in assoc(c, :diagrams),
+      where: c.document_id == ^document_id or d.document_id == ^document_id,
+      distinct: c.id
   end
 
   defp maybe_filter_by_diagrams(query, false), do: query
@@ -177,11 +183,16 @@ defmodule DiagramForge.Diagrams do
 
   @doc """
   Lists concepts for a given document.
+
+  Since concepts are globally unique, this finds all concepts that have
+  diagrams associated with the given document.
   """
   def list_concepts_for_document(document_id) do
     Repo.all(
       from c in Concept,
-        where: c.document_id == ^document_id,
+        join: d in assoc(c, :diagrams),
+        where: d.document_id == ^document_id,
+        distinct: c.id,
         order_by: [asc: c.name]
     )
   end
