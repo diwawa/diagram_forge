@@ -42,6 +42,7 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
      |> assign(:generation_total, 0)
      |> assign(:generation_completed, 0)
      |> assign(:failed_generations, %{})
+     |> assign(:diagram_theme, "dark")
      |> allow_upload(:document,
        accept: ~w(.pdf .md .markdown),
        max_entries: 1,
@@ -185,6 +186,12 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
   def handle_event("clear_search", _params, socket) do
     params = build_query_params(socket, search_query: "")
     {:noreply, push_patch(socket, to: ~p"/?#{params}")}
+  end
+
+  @impl true
+  def handle_event("toggle_diagram_theme", _params, socket) do
+    new_theme = if socket.assigns.diagram_theme == "light", do: "dark", else: "light"
+    {:noreply, assign(socket, :diagram_theme, new_theme)}
   end
 
   @impl true
@@ -810,15 +817,33 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
                     <div>
                       <h2 class="text-2xl font-semibold mb-2">{@selected_diagram.title}</h2>
                       <p class="text-slate-300">{@selected_diagram.summary}</p>
-                      <div class="flex gap-2 mt-2">
-                        <span class="text-xs px-2 py-1 bg-slate-800 rounded">
-                          {@selected_diagram.domain}
-                        </span>
-                        <%= for tag <- @selected_diagram.tags do %>
-                          <span class="text-xs px-2 py-1 bg-slate-700 rounded">
-                            {tag}
+                      <div class="flex gap-2 mt-2 items-center justify-between">
+                        <div class="flex gap-2 flex-wrap">
+                          <span class="text-xs px-2 py-1 bg-slate-800 rounded">
+                            {@selected_diagram.domain}
                           </span>
-                        <% end %>
+                          <%= for tag <- @selected_diagram.tags do %>
+                            <span class="text-xs px-2 py-1 bg-slate-700 rounded">
+                              {tag}
+                            </span>
+                          <% end %>
+                        </div>
+                        <%!-- Diagram Theme Switcher Button --%>
+                        <button
+                          phx-click="toggle_diagram_theme"
+                          class="px-3 py-1 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 rounded transition whitespace-nowrap"
+                          title={
+                            if @diagram_theme == "light",
+                              do: "Switch diagram to white on black",
+                              else: "Switch diagram to black on white"
+                          }
+                        >
+                          <%= if @diagram_theme == "light" do %>
+                            Theme: Black on White
+                          <% else %>
+                            Theme: White on Black
+                          <% end %>
+                        </button>
                       </div>
                     </div>
 
@@ -856,8 +881,13 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
                   <div
                     id="mermaid-preview"
                     phx-hook="Mermaid"
-                    class="bg-white rounded-lg p-8"
+                    class={[
+                      "rounded-lg p-8 transition-colors",
+                      @diagram_theme == "light" && "bg-white",
+                      @diagram_theme == "dark" && "bg-slate-950"
+                    ]}
                     data-diagram={@selected_diagram.diagram_source}
+                    data-theme={@diagram_theme}
                   >
                     <pre class="mermaid">{@selected_diagram.diagram_source}</pre>
                   </div>

@@ -26,10 +26,10 @@ import {hooks as colocatedHooks} from "phoenix-colocated/diagram_forge"
 import topbar from "../vendor/topbar"
 import mermaid from "mermaid"
 
-// Initialize Mermaid with dark theme
+// Initialize Mermaid with default settings
 mermaid.initialize({
   startOnLoad: false,
-  theme: "dark",
+  theme: "default",
   securityLevel: "loose"
 })
 
@@ -44,8 +44,22 @@ const Mermaid = {
   renderDiagram() {
     const diagram = this.el.querySelector(".mermaid")
     if (diagram) {
+      // Get theme from data attribute
+      const theme = this.el.dataset.theme || "light"
+      const mermaidTheme = theme === "dark" ? "dark" : "default"
+
+      // Reinitialize Mermaid with the selected theme
+      mermaid.initialize({
+        startOnLoad: false,
+        theme: mermaidTheme,
+        securityLevel: "loose"
+      })
+
       // Clear previous diagram
       diagram.removeAttribute("data-processed")
+      diagram.innerHTML = this.el.dataset.diagram
+
+      // Render with new theme
       mermaid.run({
         querySelector: ".mermaid"
       })
