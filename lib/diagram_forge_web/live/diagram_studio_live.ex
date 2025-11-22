@@ -28,6 +28,7 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
      |> assign(:concepts_total, 0)
      |> assign(:concepts, [])
      |> assign(:category_filter, nil)
+     |> assign(:search_query, "")
      |> assign(:show_only_with_diagrams, true)
      |> assign(:selected_concepts, MapSet.new())
      |> assign(:expanded_concepts, MapSet.new())
@@ -54,6 +55,7 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
     page_size = parse_int(params["page_size"], 10)
     document_id = parse_int(params["document_id"], nil)
     only_with_diagrams = parse_bool(params["only_with_diagrams"], true)
+    search_query = params["search_query"] || ""
 
     # Load the selected document if document_id is provided
     socket =
@@ -83,9 +85,14 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
      |> assign(:concepts_page, page)
      |> assign(:concepts_page_size, page_size)
      |> assign(:show_only_with_diagrams, only_with_diagrams)
+     |> assign(:search_query, search_query)
      |> assign(
        :concepts_total,
-       count_concepts(only_with_diagrams: only_with_diagrams, document_id: document_id)
+       count_concepts(
+         only_with_diagrams: only_with_diagrams,
+         document_id: document_id,
+         search_query: search_query
+       )
      )
      |> assign(
        :concepts,
@@ -93,7 +100,8 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
          page: page,
          page_size: page_size,
          only_with_diagrams: only_with_diagrams,
-         document_id: document_id
+         document_id: document_id,
+         search_query: search_query
        )
      )}
   end
@@ -155,6 +163,28 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
     new_value = !socket.assigns.show_only_with_diagrams
     params = build_query_params(socket, only_with_diagrams: new_value)
     {:noreply, push_patch(socket, to: ~p"/?#{params}")}
+  end
+
+  @impl true
+  def handle_event("search_diagrams", %{"search" => search_query}, socket) do
+    # Only search if at least 3 characters, otherwise clear search
+    search_query = String.trim(search_query)
+
+    search_query =
+      if String.length(search_query) >= 3 do
+        search_query
+      else
+        ""
+      end
+
+    params = build_query_params(socket, page: 1, search_query: search_query)
+    {:noreply, push_patch(socket, to: ~p"/?#{params}")}
+  end
+
+  @impl true
+  def handle_event("clear_filters", _params, socket) do
+    params = build_query_params(socket, category_filter: nil, search_query: "")
+    {:noreply, assign(socket, :category_filter, nil) |> push_patch(to: ~p"/?#{params}")}
   end
 
   @impl true
@@ -327,13 +357,15 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
     # Reload concepts with current pagination settings
     only_with_diagrams = socket.assigns.show_only_with_diagrams
     document_id = if socket.assigns.selected_document, do: socket.assigns.selected_document.id
+    search_query = socket.assigns.search_query
 
     concepts =
       list_concepts(
         page: socket.assigns.concepts_page,
         page_size: socket.assigns.concepts_page_size,
         only_with_diagrams: only_with_diagrams,
-        document_id: document_id
+        document_id: document_id,
+        search_query: search_query
       )
 
     {:noreply,
@@ -341,7 +373,11 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
      |> assign(:concepts, concepts)
      |> assign(
        :concepts_total,
-       count_concepts(only_with_diagrams: only_with_diagrams, document_id: document_id)
+       count_concepts(
+         only_with_diagrams: only_with_diagrams,
+         document_id: document_id,
+         search_query: search_query
+       )
      )}
   end
 
@@ -519,6 +555,20 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
                 <% end %>
               </div>
 
+              <%!-- Search Input --%>
+              <div class="mb-3">
+                <form phx-change="search_diagrams" class="w-full">
+                  <input
+                    type="text"
+                    name="search"
+                    value={@search_query}
+                    placeholder="Search diagrams (min 3 chars)..."
+                    phx-debounce="500"
+                    class="w-full px-3 py-2 text-sm bg-slate-800 border border-slate-700 rounded focus:border-blue-500 focus:outline-none"
+                  />
+                </form>
+              </div>
+
               <%!-- Pagination Controls --%>
               <% total_pages = ceil(@concepts_total / @concepts_page_size) %>
               <div class="flex items-center justify-between mb-3 pb-3 border-b border-slate-800 text-xs">
@@ -603,10 +653,9 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
                       {category}
                     </button>
                   <% end %>
-                  <%= if @category_filter do %>
+                  <%= if @category_filter || @search_query != "" do %>
                     <button
-                      phx-click="filter_category"
-                      phx-value-category={@category_filter}
+                      phx-click="clear_filters"
                       class="text-xs px-2 py-1 rounded bg-slate-800 text-slate-400 hover:text-slate-300"
                     >
                       ✕ Clear
@@ -901,6 +950,7 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
     if socket.assigns.selected_document && socket.assigns.selected_document.id == document_id do
       document = Diagrams.get_document!(document_id)
       only_with_diagrams = socket.assigns.show_only_with_diagrams
+      search_query = socket.assigns.search_query
 
       # Reload all concepts since new concepts may have been added, using current pagination
       concepts =
@@ -908,11 +958,16 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
           page: socket.assigns.concepts_page,
           page_size: socket.assigns.concepts_page_size,
           only_with_diagrams: only_with_diagrams,
-          document_id: document_id
+          document_id: document_id,
+          search_query: search_query
         )
 
       concepts_total =
-        count_concepts(only_with_diagrams: only_with_diagrams, document_id: document_id)
+        count_concepts(
+          only_with_diagrams: only_with_diagrams,
+          document_id: document_id,
+          search_query: search_query
+        )
 
       socket
       |> assign(:selected_document, document)
@@ -930,11 +985,21 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
     only_with_diagrams =
       Keyword.get(overrides, :only_with_diagrams, socket.assigns.show_only_with_diagrams)
 
+    search_query = Keyword.get(overrides, :search_query, socket.assigns.search_query)
+
     params = [
       page: page,
       page_size: page_size,
       only_with_diagrams: only_with_diagrams
     ]
+
+    # Add search_query if not empty
+    params =
+      if search_query != "" do
+        Keyword.put(params, :search_query, search_query)
+      else
+        params
+      end
 
     # Add document_id if a document is selected
     params =

@@ -124,16 +124,18 @@ defmodule DiagramForge.Diagrams do
     page_size = Keyword.get(opts, :page_size, 10)
     only_with_diagrams = Keyword.get(opts, :only_with_diagrams, false)
     document_id = Keyword.get(opts, :document_id)
+    search_query = Keyword.get(opts, :search_query, "")
     offset = (page - 1) * page_size
 
     base_query = from(c in Concept)
 
-    needs_distinct = document_id != nil or only_with_diagrams
+    needs_distinct = document_id != nil or only_with_diagrams or search_query != ""
 
     query =
       base_query
       |> maybe_filter_by_document(document_id)
       |> maybe_filter_by_diagrams(only_with_diagrams, document_id)
+      |> maybe_filter_by_search(search_query)
       |> maybe_add_distinct(needs_distinct)
       |> order_by([c], asc: c.name)
       |> limit(^page_size)
@@ -168,6 +170,17 @@ defmodule DiagramForge.Diagrams do
       where: d.document_id == ^document_id
   end
 
+  defp maybe_filter_by_search(query, ""), do: query
+
+  defp maybe_filter_by_search(query, search_query) do
+    # Search diagrams by title or summary, then filter concepts that have matching diagrams
+    search_pattern = "%#{search_query}%"
+
+    from c in query,
+      join: d in assoc(c, :diagrams),
+      where: ilike(d.title, ^search_pattern) or ilike(d.summary, ^search_pattern)
+  end
+
   defp maybe_add_distinct(query, false), do: query
 
   defp maybe_add_distinct(query, true) do
@@ -198,6 +211,17 @@ defmodule DiagramForge.Diagrams do
       where: d.document_id == ^document_id
   end
 
+  defp maybe_filter_by_search_for_count(query, ""), do: query
+
+  defp maybe_filter_by_search_for_count(query, search_query) do
+    # Search diagrams by title or summary, then count concepts that have matching diagrams
+    search_pattern = "%#{search_query}%"
+
+    from c in query,
+      join: d in assoc(c, :diagrams),
+      where: ilike(d.title, ^search_pattern) or ilike(d.summary, ^search_pattern)
+  end
+
   @doc """
   Counts total number of concepts.
 
@@ -205,10 +229,12 @@ defmodule DiagramForge.Diagrams do
 
     * `:only_with_diagrams` - Only count concepts that have diagrams (default: false)
     * `:document_id` - Only count concepts for a specific document (optional)
+    * `:search_query` - Search query for filtering by diagram title/summary (optional)
   """
   def count_concepts(opts \\ []) do
     only_with_diagrams = Keyword.get(opts, :only_with_diagrams, false)
     document_id = Keyword.get(opts, :document_id)
+    search_query = Keyword.get(opts, :search_query, "")
 
     base_query = from(c in Concept, select: count(c.id, :distinct))
 
@@ -216,6 +242,7 @@ defmodule DiagramForge.Diagrams do
       base_query
       |> maybe_filter_by_document_for_count(document_id)
       |> maybe_filter_by_diagrams_for_count(only_with_diagrams, document_id)
+      |> maybe_filter_by_search_for_count(search_query)
 
     Repo.one(query) || 0
   end

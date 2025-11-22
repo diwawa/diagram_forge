@@ -997,6 +997,264 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
     end
   end
 
+  describe "diagram search" do
+    test "search input is visible in the UI", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      assert has_element?(
+               view,
+               "input[name='search'][placeholder='Search diagrams (min 3 chars)...']"
+             )
+    end
+
+    test "searching with less than 3 characters does not filter", %{conn: conn} do
+      concept1 = fixture(:concept, name: "Concept Alpha")
+      fixture(:diagram, concept: concept1, title: "Alpha Diagram")
+
+      concept2 = fixture(:concept, name: "Concept Beta")
+      fixture(:diagram, concept: concept2, title: "Beta Diagram")
+
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      # Search with 2 characters (below minimum)
+      view
+      |> element("form[phx-change='search_diagrams']")
+      |> render_change(%{"search" => "Al"})
+
+      # Should show both concepts (no filtering)
+      html = render(view)
+      assert html =~ "Concept Alpha"
+      assert html =~ "Concept Beta"
+
+      # URL should be reset to page 1 without search_query
+      assert_patch(view, ~p"/?page=1&page_size=10&only_with_diagrams=true")
+    end
+
+    test "searching with 3+ characters filters concepts by diagram title", %{conn: conn} do
+      concept1 = fixture(:concept, name: "Concept Alpha")
+      fixture(:diagram, concept: concept1, title: "Alpha Diagram")
+
+      concept2 = fixture(:concept, name: "Concept Beta")
+      fixture(:diagram, concept: concept2, title: "Beta Diagram")
+
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      # Search for "Alpha" (matches diagram title)
+      view
+      |> element("form[phx-change='search_diagrams']")
+      |> render_change(%{"search" => "Alpha"})
+
+      # Should show only Concept Alpha
+      html = render(view)
+      assert html =~ "Concept Alpha"
+      refute html =~ "Concept Beta"
+
+      # URL should include search_query param
+      assert_patch(view, ~p"/?search_query=Alpha&page=1&page_size=10&only_with_diagrams=true")
+    end
+
+    test "searching filters concepts by diagram summary", %{conn: conn} do
+      concept1 = fixture(:concept, name: "Concept One")
+      fixture(:diagram, concept: concept1, title: "Diagram 1", summary: "This is about Phoenix")
+
+      concept2 = fixture(:concept, name: "Concept Two")
+      fixture(:diagram, concept: concept2, title: "Diagram 2", summary: "This is about Elixir")
+
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      # Search for "Phoenix" (matches diagram summary)
+      view
+      |> element("form[phx-change='search_diagrams']")
+      |> render_change(%{"search" => "Phoenix"})
+
+      # Should show only Concept One
+      html = render(view)
+      assert html =~ "Concept One"
+      refute html =~ "Concept Two"
+    end
+
+    test "search is case-insensitive", %{conn: conn} do
+      concept = fixture(:concept, name: "Test Concept")
+      fixture(:diagram, concept: concept, title: "GenServer Diagram")
+
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      # Search with lowercase
+      view
+      |> element("form[phx-change='search_diagrams']")
+      |> render_change(%{"search" => "genserver"})
+
+      # Should find the diagram
+      html = render(view)
+      assert html =~ "Test Concept"
+    end
+
+    test "search shows Clear button when active", %{conn: conn} do
+      concept = fixture(:concept, name: "Test Concept")
+      fixture(:diagram, concept: concept, title: "Test Diagram")
+
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      # Initially no Clear button
+      refute has_element?(view, "button[phx-click='clear_filters']")
+
+      # Search for something
+      view
+      |> element("form[phx-change='search_diagrams']")
+      |> render_change(%{"search" => "Test"})
+
+      # Clear button should appear
+      assert has_element?(view, "button[phx-click='clear_filters']", "✕ Clear")
+    end
+
+    test "Clear button clears search query", %{conn: conn} do
+      concept1 = fixture(:concept, name: "Concept Alpha")
+      fixture(:diagram, concept: concept1, title: "Alpha Diagram")
+
+      concept2 = fixture(:concept, name: "Concept Beta")
+      fixture(:diagram, concept: concept2, title: "Beta Diagram")
+
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      # Search for "Alpha"
+      view
+      |> element("form[phx-change='search_diagrams']")
+      |> render_change(%{"search" => "Alpha"})
+
+      # Verify only Alpha is shown
+      html = render(view)
+      assert html =~ "Concept Alpha"
+      refute html =~ "Concept Beta"
+
+      # Click Clear button
+      view
+      |> element("button[phx-click='clear_filters']")
+      |> render_click()
+
+      # Should show both concepts again
+      html = render(view)
+      assert html =~ "Concept Alpha"
+      assert html =~ "Concept Beta"
+
+      # URL should not have search_query param
+      assert_patch(view, ~p"/?page=1&page_size=10&only_with_diagrams=true")
+    end
+
+    test "search query is preserved in URL for bookmarking", %{conn: conn} do
+      concept = fixture(:concept, name: "Test Concept")
+      fixture(:diagram, concept: concept, title: "Phoenix Framework")
+
+      # Load page with search_query in URL
+      {:ok, _view, html} = live(conn, ~p"/?search_query=Phoenix")
+
+      # Should show filtered results
+      assert html =~ "Test Concept"
+    end
+
+    test "search resets to page 1", %{conn: conn} do
+      # Create 15 concepts with diagrams
+      for i <- 1..15 do
+        concept =
+          fixture(:concept, name: "Concept #{String.pad_leading(Integer.to_string(i), 2, "0")}")
+
+        fixture(:diagram, concept: concept, title: "Diagram #{i}")
+      end
+
+      # Start on page 2 with page size 5
+      {:ok, view, _html} = live(conn, ~p"/?page=2&page_size=5")
+
+      # Verify we're on page 2
+      assert render(view) =~ "Page 2 of 3"
+
+      # Perform a search
+      view
+      |> element("form[phx-change='search_diagrams']")
+      |> render_change(%{"search" => "Diagram"})
+
+      # Should reset to page 1
+      assert_patch(view, ~p"/?search_query=Diagram&page=1&page_size=5&only_with_diagrams=true")
+    end
+
+    test "search works with document filter", %{conn: conn} do
+      doc1 = fixture(:document, title: "Doc 1")
+      concept1 = fixture(:concept, name: "Concept 1", document: doc1)
+      fixture(:diagram, concept: concept1, title: "Phoenix Diagram", document: doc1)
+
+      doc2 = fixture(:document, title: "Doc 2")
+      concept2 = fixture(:concept, name: "Concept 2", document: doc2)
+      fixture(:diagram, concept: concept2, title: "Elixir Diagram", document: doc2)
+
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      # Select document 1
+      view
+      |> element("[phx-value-id='#{doc1.id}']")
+      |> render_click()
+
+      # Search for "Phoenix"
+      view
+      |> element("form[phx-change='search_diagrams']")
+      |> render_change(%{"search" => "Phoenix"})
+
+      # Should show only Concept 1
+      html = render(view)
+      assert html =~ "Concept 1"
+      refute html =~ "Concept 2"
+    end
+
+    test "search updates concept count correctly", %{conn: conn} do
+      concept1 = fixture(:concept, name: "Concept Alpha")
+      fixture(:diagram, concept: concept1, title: "Alpha Diagram")
+
+      concept2 = fixture(:concept, name: "Concept Beta")
+      fixture(:diagram, concept: concept2, title: "Beta Diagram")
+
+      concept3 = fixture(:concept, name: "Concept Gamma")
+      fixture(:diagram, concept: concept3, title: "Gamma Diagram")
+
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      # Initially shows 3 total
+      assert render(view) =~ "3 total"
+
+      # Search for "Alpha"
+      view
+      |> element("form[phx-change='search_diagrams']")
+      |> render_change(%{"search" => "Alpha"})
+
+      # Should show 1 total
+      assert render(view) =~ "1 total"
+    end
+
+    test "empty search query shows all concepts", %{conn: conn} do
+      concept1 = fixture(:concept, name: "Concept Alpha")
+      fixture(:diagram, concept: concept1, title: "Alpha Diagram")
+
+      concept2 = fixture(:concept, name: "Concept Beta")
+      fixture(:diagram, concept: concept2, title: "Beta Diagram")
+
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      # Search for something first
+      view
+      |> element("form[phx-change='search_diagrams']")
+      |> render_change(%{"search" => "Alpha"})
+
+      # Verify only Alpha is shown
+      refute render(view) =~ "Concept Beta"
+
+      # Clear search by entering empty string
+      view
+      |> element("form[phx-change='search_diagrams']")
+      |> render_change(%{"search" => ""})
+
+      # Should show all concepts
+      html = render(view)
+      assert html =~ "Concept Alpha"
+      assert html =~ "Concept Beta"
+    end
+  end
+
   # Helper function to expand a concept before interacting with its content
   defp expand_concept(view, concept_id) do
     view
