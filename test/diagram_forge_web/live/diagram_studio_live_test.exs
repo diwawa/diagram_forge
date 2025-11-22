@@ -35,6 +35,7 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
     test "loads concepts and diagrams for selected document", %{conn: conn} do
       document = fixture(:document)
       concept = fixture(:concept, document_id: document.id)
+      fixture(:diagram, concept: concept)
       diagram = fixture(:diagram, document_id: document.id, concept_id: concept.id)
 
       {:ok, view, _html} = live(conn, ~p"/")
@@ -62,8 +63,8 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
     test "clears selected concepts when switching documents", %{conn: conn} do
       doc1 = fixture(:document, title: "Doc 1")
       doc2 = fixture(:document, title: "Doc 2")
-      concept1 = fixture(:concept, document_id: doc1.id)
-      _concept2 = fixture(:concept, document_id: doc2.id)
+      concept1 = fixture(:concept, document: doc1)
+      _concept2 = fixture(:concept, document: doc2)
 
       {:ok, view, _html} = live(conn, ~p"/")
 
@@ -71,6 +72,8 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
       view
       |> element("[phx-value-id='#{doc1.id}']")
       |> render_click()
+
+      show_all_concepts(view)
 
       view
       |> expand_concept(concept1.id)
@@ -87,9 +90,9 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
       |> element("[phx-value-id='#{doc2.id}']")
       |> render_click()
 
-      # Verify selected concepts were cleared
+      # Verify selected concepts were cleared (check for concept selection checkboxes specifically)
       refute view
-             |> element("input[checked]")
+             |> element("input[phx-click='toggle_concept'][checked]")
              |> has_element?()
     end
   end
@@ -104,6 +107,8 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
       view
       |> element("[phx-value-id='#{document.id}']")
       |> render_click()
+
+      show_all_concepts(view)
 
       # Toggle concept on
       view
@@ -129,6 +134,8 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
       view
       |> element("[phx-value-id='#{document.id}']")
       |> render_click()
+
+      show_all_concepts(view)
 
       # Toggle on
       view
@@ -161,6 +168,8 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
       |> element("[phx-value-id='#{document.id}']")
       |> render_click()
 
+      show_all_concepts(view)
+
       # Select both concepts
       view
       |> expand_concept(concept1.id)
@@ -188,6 +197,8 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
       view
       |> element("[phx-value-id='#{document.id}']")
       |> render_click()
+
+      show_all_concepts(view)
 
       # Select both concepts
       view
@@ -226,6 +237,7 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
     test "displays selected diagram in preview area", %{conn: conn} do
       document = fixture(:document)
       concept = fixture(:concept, document_id: document.id)
+      fixture(:diagram, concept: concept)
 
       diagram =
         fixture(:diagram,
@@ -240,6 +252,8 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
       view
       |> element("[phx-value-id='#{document.id}']")
       |> render_click()
+
+      show_all_concepts(view)
 
       view
       |> expand_concept(concept.id)
@@ -403,6 +417,7 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
     test "refreshes diagrams when new diagram is created", %{conn: conn} do
       document = fixture(:document)
       concept = fixture(:concept, document_id: document.id)
+      fixture(:diagram, concept: concept)
 
       {:ok, view, _html} = live(conn, ~p"/")
 
@@ -434,6 +449,7 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
     test "ignores diagram creation when no document is selected", %{conn: conn} do
       document = fixture(:document)
       concept = fixture(:concept, document_id: document.id)
+      fixture(:diagram, concept: concept)
 
       {:ok, view, _html} = live(conn, ~p"/")
 
@@ -474,14 +490,16 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
   describe "generation progress tracking" do
     test "displays progress bar during diagram generation", %{conn: conn} do
       document = fixture(:document)
-      concept1 = fixture(:concept, document_id: document.id)
-      concept2 = fixture(:concept, document_id: document.id)
+      concept1 = fixture(:concept, document: document)
+      concept2 = fixture(:concept, document: document)
 
       {:ok, view, _html} = live(conn, ~p"/")
 
       view
       |> element("[phx-value-id='#{document.id}']")
       |> render_click()
+
+      show_all_concepts(view)
 
       # Select both concepts
       view
@@ -507,13 +525,15 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
 
     test "updates progress when generation completes", %{conn: conn} do
       document = fixture(:document)
-      concept = fixture(:concept, document_id: document.id)
+      concept = fixture(:concept, document: document)
 
       {:ok, view, _html} = live(conn, ~p"/")
 
       view
       |> element("[phx-value-id='#{document.id}']")
       |> render_click()
+
+      show_all_concepts(view)
 
       view
       |> expand_concept(concept.id)
@@ -548,7 +568,8 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
 
     test "handles generation_started event", %{conn: conn} do
       document = fixture(:document)
-      concept = fixture(:concept, document_id: document.id)
+      concept = fixture(:concept, document: document)
+      fixture(:diagram, concept: concept)
 
       {:ok, view, _html} = live(conn, ~p"/")
 
@@ -567,13 +588,15 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
 
     test "handles generation_failed event with error details", %{conn: conn} do
       document = fixture(:document)
-      concept = fixture(:concept, document_id: document.id, name: "Test Concept")
+      concept = fixture(:concept, document: document, name: "Test Concept")
 
       {:ok, view, _html} = live(conn, ~p"/")
 
       view
       |> element("[phx-value-id='#{document.id}']")
       |> render_click()
+
+      show_all_concepts(view)
 
       view
       |> expand_concept(concept.id)
@@ -605,8 +628,8 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
     test "resets progress tracking when switching documents", %{conn: conn} do
       doc1 = fixture(:document, title: "Doc 1")
       doc2 = fixture(:document, title: "Doc 2")
-      concept1 = fixture(:concept, document_id: doc1.id)
-      _concept2 = fixture(:concept, document_id: doc2.id)
+      concept1 = fixture(:concept, document: doc1)
+      _concept2 = fixture(:concept, document: doc2)
 
       {:ok, view, _html} = live(conn, ~p"/")
 
@@ -614,6 +637,8 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
       view
       |> element("[phx-value-id='#{doc1.id}']")
       |> render_click()
+
+      show_all_concepts(view)
 
       view
       |> expand_concept(concept1.id)
@@ -647,6 +672,8 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
       view
       |> element("[phx-value-id='#{document.id}']")
       |> render_click()
+
+      show_all_concepts(view)
 
       view
       |> expand_concept(concept.id)
@@ -682,6 +709,8 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
       |> element("[phx-value-id='#{document.id}']")
       |> render_click()
 
+      show_all_concepts(view)
+
       view
       |> expand_concept(concept.id)
       |> element("input[phx-value-id='#{concept.id}']")
@@ -715,6 +744,8 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
       view
       |> element("[phx-value-id='#{document.id}']")
       |> render_click()
+
+      show_all_concepts(view)
 
       view
       |> expand_concept(concept.id)
@@ -750,6 +781,8 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
       |> element("[phx-value-id='#{document.id}']")
       |> render_click()
 
+      show_all_concepts(view)
+
       view
       |> expand_concept(concept.id)
       |> element("input[phx-value-id='#{concept.id}']")
@@ -783,6 +816,8 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
       view
       |> element("[phx-value-id='#{document.id}']")
       |> render_click()
+
+      show_all_concepts(view)
 
       view
       |> expand_concept(concept.id)
@@ -822,7 +857,10 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
     test "loads with default pagination params from URL", %{conn: conn} do
       # Create 15 concepts to test pagination (padded for correct alphabetical sorting)
       for i <- 1..15 do
-        fixture(:concept, name: "Concept #{String.pad_leading(Integer.to_string(i), 2, "0")}")
+        concept =
+          fixture(:concept, name: "Concept #{String.pad_leading(Integer.to_string(i), 2, "0")}")
+
+        fixture(:diagram, concept: concept)
       end
 
       {:ok, _view, html} = live(conn, ~p"/?page=1&page_size=5")
@@ -841,7 +879,10 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
     test "changing page size updates URL and displays correct number of items", %{conn: conn} do
       # Create 15 concepts (padded for correct alphabetical sorting)
       for i <- 1..15 do
-        fixture(:concept, name: "Concept #{String.pad_leading(Integer.to_string(i), 2, "0")}")
+        concept =
+          fixture(:concept, name: "Concept #{String.pad_leading(Integer.to_string(i), 2, "0")}")
+
+        fixture(:diagram, concept: concept)
       end
 
       {:ok, view, _html} = live(conn, ~p"/")
@@ -858,7 +899,7 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
       |> render_change(%{"page_size" => "5"})
 
       # Verify URL was updated
-      assert_patch(view, ~p"/?page=1&page_size=5")
+      assert_patch(view, ~p"/?page=1&page_size=5&only_with_diagrams=true")
 
       # Now should only show 5 items
       html = render(view)
@@ -873,7 +914,10 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
     test "navigating pages updates URL and displays correct items", %{conn: conn} do
       # Create 15 concepts (padded for correct alphabetical sorting)
       for i <- 1..15 do
-        fixture(:concept, name: "Concept #{String.pad_leading(Integer.to_string(i), 2, "0")}")
+        concept =
+          fixture(:concept, name: "Concept #{String.pad_leading(Integer.to_string(i), 2, "0")}")
+
+        fixture(:diagram, concept: concept)
       end
 
       {:ok, view, _html} = live(conn, ~p"/?page=1&page_size=5")
@@ -884,7 +928,7 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
       |> render_click()
 
       # Verify URL was updated
-      assert_patch(view, ~p"/?page=2&page_size=5")
+      assert_patch(view, ~p"/?page=2&page_size=5&only_with_diagrams=true")
 
       # Verify we see page 2 items (concepts 6-10)
       html = render(view)
@@ -900,7 +944,10 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
     test "bookmarkable URLs load correct page and size", %{conn: conn} do
       # Create 30 concepts (padded for correct alphabetical sorting)
       for i <- 1..30 do
-        fixture(:concept, name: "Concept #{String.pad_leading(Integer.to_string(i), 2, "0")}")
+        concept =
+          fixture(:concept, name: "Concept #{String.pad_leading(Integer.to_string(i), 2, "0")}")
+
+        fixture(:diagram, concept: concept)
       end
 
       # Load page 2 with page size 10 directly from URL
@@ -920,7 +967,10 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
     test "changing page size resets to page 1", %{conn: conn} do
       # Create 20 concepts (padded for correct alphabetical sorting)
       for i <- 1..20 do
-        fixture(:concept, name: "Concept #{String.pad_leading(Integer.to_string(i), 2, "0")}")
+        concept =
+          fixture(:concept, name: "Concept #{String.pad_leading(Integer.to_string(i), 2, "0")}")
+
+        fixture(:diagram, concept: concept)
       end
 
       # Start on page 2
@@ -937,7 +987,7 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
       |> render_change(%{"page_size" => "10"})
 
       # Should reset to page 1
-      assert_patch(view, ~p"/?page=1&page_size=10")
+      assert_patch(view, ~p"/?page=1&page_size=10&only_with_diagrams=true")
 
       # Should show first 10 concepts
       html = render(view)
@@ -951,6 +1001,15 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
   defp expand_concept(view, concept_id) do
     view
     |> element("[phx-click='toggle_concept_expand'][phx-value-id='#{concept_id}']")
+    |> render_click()
+
+    view
+  end
+
+  # Helper function to turn off the "only with diagrams" filter
+  defp show_all_concepts(view) do
+    view
+    |> element("input[type='checkbox'][phx-click='toggle_show_only_with_diagrams'][checked]")
     |> render_click()
 
     view

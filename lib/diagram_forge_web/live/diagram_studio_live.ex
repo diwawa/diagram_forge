@@ -28,7 +28,7 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
      |> assign(:concepts_total, 0)
      |> assign(:concepts, [])
      |> assign(:category_filter, nil)
-     |> assign(:show_only_with_diagrams, false)
+     |> assign(:show_only_with_diagrams, true)
      |> assign(:selected_concepts, MapSet.new())
      |> assign(:expanded_concepts, MapSet.new())
      |> assign(:diagrams, [])
@@ -53,7 +53,7 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
     page = parse_int(params["page"], 1)
     page_size = parse_int(params["page_size"], 10)
     document_id = parse_int(params["document_id"], nil)
-    only_with_diagrams = socket.assigns.show_only_with_diagrams
+    only_with_diagrams = parse_bool(params["only_with_diagrams"], true)
 
     # Load the selected document if document_id is provided
     socket =
@@ -79,6 +79,7 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
      socket
      |> assign(:concepts_page, page)
      |> assign(:concepts_page_size, page_size)
+     |> assign(:show_only_with_diagrams, only_with_diagrams)
      |> assign(
        :concepts_total,
        count_concepts(only_with_diagrams: only_with_diagrams, document_id: document_id)
@@ -149,26 +150,8 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
   @impl true
   def handle_event("toggle_show_only_with_diagrams", _params, socket) do
     new_value = !socket.assigns.show_only_with_diagrams
-    only_with_diagrams = new_value
-    document_id = if socket.assigns.selected_document, do: socket.assigns.selected_document.id
-
-    # Reload concepts with the new filter
-    concepts =
-      list_concepts(
-        page: socket.assigns.concepts_page,
-        page_size: socket.assigns.concepts_page_size,
-        only_with_diagrams: only_with_diagrams,
-        document_id: document_id
-      )
-
-    {:noreply,
-     socket
-     |> assign(:show_only_with_diagrams, new_value)
-     |> assign(:concepts, concepts)
-     |> assign(
-       :concepts_total,
-       count_concepts(only_with_diagrams: only_with_diagrams, document_id: document_id)
-     )}
+    params = build_query_params(socket, only_with_diagrams: new_value)
+    {:noreply, push_patch(socket, to: ~p"/?#{params}")}
   end
 
   @impl true
@@ -420,7 +403,10 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
       <%!-- Top Navbar --%>
       <div class="bg-slate-900 border-b border-slate-800">
         <div class="container mx-auto px-4 py-3">
-          <h1 class="text-xl font-bold text-slate-100">DiagramForge Studio</h1>
+          <div class="flex items-center gap-3">
+            <img src={~p"/images/logo.png"} alt="DiagramForge" class="h-10 w-10" />
+            <h1 class="text-xl font-bold text-slate-100">DiagramForge Studio</h1>
+          </div>
         </div>
       </div>
 
@@ -938,9 +924,13 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
     page = Keyword.get(overrides, :page, socket.assigns.concepts_page)
     page_size = Keyword.get(overrides, :page_size, socket.assigns.concepts_page_size)
 
+    only_with_diagrams =
+      Keyword.get(overrides, :only_with_diagrams, socket.assigns.show_only_with_diagrams)
+
     params = [
       page: page,
-      page_size: page_size
+      page_size: page_size,
+      only_with_diagrams: only_with_diagrams
     ]
 
     # Add document_id if a document is selected
@@ -964,6 +954,11 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
   end
 
   defp parse_int(value, _default) when is_integer(value), do: value
+
+  defp parse_bool(nil, default), do: default
+  defp parse_bool("true", _default), do: true
+  defp parse_bool("false", _default), do: false
+  defp parse_bool(value, _default) when is_boolean(value), do: value
 
   defp format_status(status) do
     case status do

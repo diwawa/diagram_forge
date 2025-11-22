@@ -24,7 +24,7 @@ defmodule DiagramForge.Diagrams.DocumentIngestor do
     tmp_txt = Path.join(System.tmp_dir!(), "#{Path.basename(path)}.txt")
 
     try do
-      case System.cmd("pdftotext", ["-layout", path, tmp_txt]) do
+      case System.cmd("pdftotext", ["-layout", path, tmp_txt], stderr_to_stdout: true) do
         {_, 0} ->
           case File.read(tmp_txt) do
             {:ok, text} ->
