@@ -145,18 +145,23 @@ defmodule DiagramForge.AI.Prompts do
 
     Assume the reader is a curious developer preparing for interviews.
 
-    Follow the same JSON structure as before:
+    Return JSON with both diagram and concept information:
 
     {
-      "title": "...",
+      "title": "Readable title for the diagram",
       "domain": "elixir | phoenix | http | kafka | llm | agents | other",
-      "tags": ["...", "..."],
+      "tags": ["list", "of", "short", "tags"],
       "mermaid": "mermaid code here",
-      "summary": "...",
-      "notes_md": "markdown bullets..."
+      "summary": "1–2 sentence explanation of what the diagram shows",
+      "notes_md": "markdown bullets explaining key points",
+      "concept": {
+        "name": "short name for the main concept (e.g., 'GenServer', 'ElevenLabs', 'OAuth')",
+        "short_description": "1–2 sentence description suitable for learners",
+        "category": "elixir | phoenix | http | kafka | llm | agents | other"
+      }
     }
 
-    Choose domain based on the description.
+    The concept should identify the main topic/entity being explained, not just repeat the diagram title.
     Only output JSON.
     """
   end

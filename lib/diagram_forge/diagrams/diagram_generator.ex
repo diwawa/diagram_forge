@@ -3,6 +3,8 @@ defmodule DiagramForge.Diagrams.DiagramGenerator do
   Generates Mermaid diagrams from concepts or free-form prompts using LLM.
   """
 
+  import Ecto.Query
+
   alias DiagramForge.AI.Client
   alias DiagramForge.AI.Prompts
   alias DiagramForge.Diagrams.{Concept, Diagram, Document}
@@ -79,7 +81,11 @@ defmodule DiagramForge.Diagrams.DiagramGenerator do
       )
       |> Jason.decode!()
 
+    # Find or create the concept
+    concept = find_or_create_concept(json["concept"])
+
     attrs = %{
+      concept_id: concept && concept.id,
       title: json["title"],
       slug: slugify(json["title"]),
       domain: json["domain"],
@@ -97,6 +103,40 @@ defmodule DiagramForge.Diagrams.DiagramGenerator do
       {:ok, diagram}
     else
       {:error, changeset}
+    end
+  end
+
+  defp find_or_create_concept(nil), do: nil
+
+  defp find_or_create_concept(concept_attrs) when is_map(concept_attrs) do
+    name = concept_attrs["name"]
+
+    # If name is missing, we can't create a concept
+    if is_nil(name) or String.trim(name) == "" do
+      nil
+    else
+      # Look up concept globally by name (case-insensitive)
+      existing =
+        Repo.one(
+          from c in Concept,
+            where: fragment("LOWER(?)", c.name) == ^String.downcase(name),
+            limit: 1
+        )
+
+      if existing do
+        # Concept already exists globally, reuse it as-is
+        existing
+      else
+        # Create new concept without a document (generated from prompt)
+        %Concept{}
+        |> Concept.changeset(%{
+          document_id: nil,
+          name: name,
+          short_description: concept_attrs["short_description"],
+          category: concept_attrs["category"]
+        })
+        |> Repo.insert!()
+      end
     end
   end
 
