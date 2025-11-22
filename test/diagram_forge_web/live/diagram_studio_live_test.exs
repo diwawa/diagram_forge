@@ -1095,16 +1095,16 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
 
       {:ok, view, _html} = live(conn, ~p"/")
 
-      # Initially no Clear button
-      refute has_element?(view, "button[phx-click='clear_filters']")
+      # Initially no search Clear button
+      refute has_element?(view, "button[phx-click='clear_search']")
 
       # Search for something
       view
       |> element("form[phx-change='search_diagrams']")
       |> render_change(%{"search" => "Test"})
 
-      # Clear button should appear
-      assert has_element?(view, "button[phx-click='clear_filters']", "✕ Clear")
+      # Search Clear button should appear
+      assert has_element?(view, "button[phx-click='clear_search']", "✕ Clear")
     end
 
     test "Clear button clears search query", %{conn: conn} do
@@ -1126,9 +1126,9 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
       assert html =~ "Concept Alpha"
       refute html =~ "Concept Beta"
 
-      # Click Clear button
+      # Click Clear button (next to search box)
       view
-      |> element("button[phx-click='clear_filters']")
+      |> element("button[phx-click='clear_search']")
       |> render_click()
 
       # Should show both concepts again

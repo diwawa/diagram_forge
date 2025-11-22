@@ -182,9 +182,9 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
   end
 
   @impl true
-  def handle_event("clear_filters", _params, socket) do
-    params = build_query_params(socket, category_filter: nil, search_query: "")
-    {:noreply, assign(socket, :category_filter, nil) |> push_patch(to: ~p"/?#{params}")}
+  def handle_event("clear_search", _params, socket) do
+    params = build_query_params(socket, search_query: "")
+    {:noreply, push_patch(socket, to: ~p"/?#{params}")}
   end
 
   @impl true
@@ -558,14 +558,25 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
               <%!-- Search Input --%>
               <div class="mb-3">
                 <form phx-change="search_diagrams" class="w-full">
-                  <input
-                    type="text"
-                    name="search"
-                    value={@search_query}
-                    placeholder="Search diagrams (min 3 chars)..."
-                    phx-debounce="500"
-                    class="w-full px-3 py-2 text-sm bg-slate-800 border border-slate-700 rounded focus:border-blue-500 focus:outline-none"
-                  />
+                  <div class="flex gap-2">
+                    <input
+                      type="text"
+                      name="search"
+                      value={@search_query}
+                      placeholder="Search diagrams (min 3 chars)..."
+                      phx-debounce="500"
+                      class="flex-1 px-3 py-2 text-sm bg-slate-800 border border-slate-700 rounded focus:border-blue-500 focus:outline-none"
+                    />
+                    <%= if @search_query != "" do %>
+                      <button
+                        type="button"
+                        phx-click="clear_search"
+                        class="px-3 py-2 text-sm bg-slate-800 border border-slate-700 rounded text-slate-400 hover:text-slate-300 hover:border-slate-600"
+                      >
+                        ✕ Clear
+                      </button>
+                    <% end %>
+                  </div>
                 </form>
               </div>
 
@@ -653,9 +664,10 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
                       {category}
                     </button>
                   <% end %>
-                  <%= if @category_filter || @search_query != "" do %>
+                  <%= if @category_filter do %>
                     <button
-                      phx-click="clear_filters"
+                      phx-click="filter_category"
+                      phx-value-category={@category_filter}
                       class="text-xs px-2 py-1 rounded bg-slate-800 text-slate-400 hover:text-slate-300"
                     >
                       ✕ Clear
