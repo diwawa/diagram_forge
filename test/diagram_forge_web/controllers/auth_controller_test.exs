@@ -164,15 +164,15 @@ defmodule DiagramForgeWeb.AuthControllerTest do
     test "saves pending diagram after successful OAuth and redirects to diagram permalink", %{
       conn: conn
     } do
-      # Set up pending diagram save in session
+      # Set up pending diagram save in session with string keys (as it comes from JSON.decode)
       pending_diagram = %{
-        title: "Test Diagram",
-        slug: "test-diagram",
-        diagram_source: "graph TD\nA-->B",
-        summary: "A test diagram",
-        notes_md: "# Notes\n\nTest notes",
-        domain: "testing",
-        tags: ["test"]
+        "title" => "Test Diagram",
+        "slug" => "test-diagram",
+        "diagram_source" => "graph TD\nA-->B",
+        "summary" => "A test diagram",
+        "notes_md" => "# Notes\n\nTest notes",
+        "domain" => "testing",
+        "tags" => ["test"]
       }
 
       auth =
@@ -217,10 +217,10 @@ defmodule DiagramForgeWeb.AuthControllerTest do
     end
 
     test "handles diagram save failure and cleans up session", %{conn: conn} do
-      # Set up pending diagram with invalid data (missing required fields)
+      # Set up pending diagram with invalid data (missing required fields) using string keys
       pending_diagram = %{
         # Missing title, which is required
-        diagram_source: "graph TD\nA-->B"
+        "diagram_source" => "graph TD\nA-->B"
       }
 
       auth =

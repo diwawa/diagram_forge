@@ -81,7 +81,10 @@ defmodule DiagramForgeWeb.AuthController do
   defp save_pending_diagram(conn, diagram_attrs, user) do
     alias DiagramForge.Diagrams
 
-    case Diagrams.create_diagram_for_user(diagram_attrs, user) do
+    # Convert string keys to atom keys for Ecto compatibility
+    atomized_attrs = atomize_diagram_keys(diagram_attrs)
+
+    case Diagrams.create_diagram_for_user(atomized_attrs, user) do
       {:ok, diagram} ->
         conn
         |> delete_session(:pending_diagram_save)
@@ -96,6 +99,19 @@ defmodule DiagramForgeWeb.AuthController do
         |> put_flash(:error, "Failed to save diagram. Please try again.")
         |> redirect(to: "/")
     end
+  end
+
+  # Safely convert known diagram string keys to atoms
+  defp atomize_diagram_keys(attrs) when is_map(attrs) do
+    %{
+      title: attrs["title"],
+      slug: attrs["slug"],
+      diagram_source: attrs["diagram_source"],
+      summary: attrs["summary"],
+      notes_md: attrs["notes_md"],
+      domain: attrs["domain"],
+      tags: attrs["tags"]
+    }
   end
 
   defp get_redirect_path(conn) do
