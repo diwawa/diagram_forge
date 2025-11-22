@@ -14,7 +14,7 @@ defmodule DiagramForge.Accounts.User do
     field :name, :string
     field :provider, :string, default: "github"
     field :provider_uid, :string
-    field :provider_token, :binary
+    field :provider_token, DiagramForge.Vault.EncryptedBinary
     field :avatar_url, :string
     field :last_sign_in_at, :utc_datetime
 

@@ -74,6 +74,7 @@ defmodule DiagramForge.MixProject do
       {:earmark, "~> 1.4"},
       {:ueberauth, "~> 0.10"},
       {:ueberauth_github, "~> 0.8"},
+      {:cloak_ecto, "~> 1.2"},
       {:mox, "~> 1.0", only: :test},
       {:bypass, "~> 2.1", only: :test},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},

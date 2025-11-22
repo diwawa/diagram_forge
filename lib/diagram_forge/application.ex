@@ -10,6 +10,7 @@ defmodule DiagramForge.Application do
     children = [
       DiagramForgeWeb.Telemetry,
       DiagramForge.Repo,
+      DiagramForge.Vault,
       {Oban, Application.fetch_env!(:diagram_forge, Oban)},
       {DNSCluster, query: Application.get_env(:diagram_forge, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: DiagramForge.PubSub},

@@ -8,7 +8,7 @@ defmodule DiagramForge.Repo.Migrations.CreateUsers do
       add :name, :string
       add :provider, :string, default: "github", null: false
       add :provider_uid, :string, null: false
-      add :provider_token, :text
+      add :provider_token, :binary
       add :avatar_url, :string
       add :last_sign_in_at, :utc_datetime
 
