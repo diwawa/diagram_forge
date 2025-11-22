@@ -133,7 +133,7 @@ defmodule DiagramForge.Diagrams do
     query =
       base_query
       |> maybe_filter_by_document(document_id)
-      |> maybe_filter_by_diagrams(only_with_diagrams)
+      |> maybe_filter_by_diagrams(only_with_diagrams, document_id)
       |> maybe_add_distinct(needs_distinct)
       |> order_by([c], asc: c.name)
       |> limit(^page_size)
@@ -153,11 +153,19 @@ defmodule DiagramForge.Diagrams do
       where: c.document_id == ^document_id or d.document_id == ^document_id
   end
 
-  defp maybe_filter_by_diagrams(query, false), do: query
+  defp maybe_filter_by_diagrams(query, false, _document_id), do: query
 
-  defp maybe_filter_by_diagrams(query, true) do
+  defp maybe_filter_by_diagrams(query, true, nil) do
+    # No document selected - show concepts with any diagrams
     from c in query,
       join: d in assoc(c, :diagrams)
+  end
+
+  defp maybe_filter_by_diagrams(query, true, document_id) do
+    # Document selected - show concepts with diagrams for this document
+    from c in query,
+      join: d in assoc(c, :diagrams),
+      where: d.document_id == ^document_id
   end
 
   defp maybe_add_distinct(query, false), do: query
@@ -175,11 +183,19 @@ defmodule DiagramForge.Diagrams do
       where: c.document_id == ^document_id or d.document_id == ^document_id
   end
 
-  defp maybe_filter_by_diagrams_for_count(query, false), do: query
+  defp maybe_filter_by_diagrams_for_count(query, false, _document_id), do: query
 
-  defp maybe_filter_by_diagrams_for_count(query, true) do
+  defp maybe_filter_by_diagrams_for_count(query, true, nil) do
+    # No document selected - count concepts with any diagrams
     from c in query,
       join: d in assoc(c, :diagrams)
+  end
+
+  defp maybe_filter_by_diagrams_for_count(query, true, document_id) do
+    # Document selected - count concepts with diagrams for this document
+    from c in query,
+      join: d in assoc(c, :diagrams),
+      where: d.document_id == ^document_id
   end
 
   @doc """
@@ -199,7 +215,7 @@ defmodule DiagramForge.Diagrams do
     query =
       base_query
       |> maybe_filter_by_document_for_count(document_id)
-      |> maybe_filter_by_diagrams_for_count(only_with_diagrams)
+      |> maybe_filter_by_diagrams_for_count(only_with_diagrams, document_id)
 
     Repo.one(query) || 0
   end
