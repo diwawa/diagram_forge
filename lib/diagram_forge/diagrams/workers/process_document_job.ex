@@ -8,7 +8,9 @@ defmodule DiagramForge.Diagrams.Workers.ProcessDocumentJob do
   3. Updates the document status accordingly
   """
 
-  use Oban.Worker, queue: :documents
+  use Oban.Worker, queue: :documents, max_attempts: 3
+
+  require Logger
 
   alias DiagramForge.Diagrams.{ConceptExtractor, Document, DocumentIngestor}
   alias DiagramForge.Repo
@@ -22,19 +24,30 @@ defmodule DiagramForge.Diagrams.Workers.ProcessDocumentJob do
 
     doc = Repo.get!(Document, doc_id)
 
+    Logger.info("Starting document processing: document_id=#{doc.id}, title=#{doc.title}")
+
     doc
     |> Document.changeset(%{status: :processing})
     |> Repo.update!()
 
     case DocumentIngestor.extract_text(doc) do
       {:ok, text} ->
+        Logger.info(
+          "Text extracted successfully: document_id=#{doc.id}, text_length=#{String.length(text)}"
+        )
+
         # Update raw_text and extract concepts
         doc =
           doc
           |> Document.changeset(%{raw_text: text})
           |> Repo.update!()
 
-        ConceptExtractor.extract_for_document(doc, opts)
+        Logger.info("Starting concept extraction for document_id=#{doc.id}")
+        concepts = ConceptExtractor.extract_for_document(doc, opts)
+
+        Logger.info(
+          "Concept extraction complete: document_id=#{doc.id}, concepts_count=#{length(concepts)}"
+        )
 
         # Update status to ready in a single changeset with raw_text to ensure both are persisted
         doc

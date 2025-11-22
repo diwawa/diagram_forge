@@ -282,6 +282,21 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
   end
 
   @impl true
+  def handle_info({:concepts_updated, _document_id}, socket) do
+    # Reload concepts with current pagination settings
+    concepts =
+      list_concepts(
+        page: socket.assigns.concepts_page,
+        page_size: socket.assigns.concepts_page_size
+      )
+
+    {:noreply,
+     socket
+     |> assign(:concepts, concepts)
+     |> assign(:concepts_total, count_concepts())}
+  end
+
+  @impl true
   def handle_info({:diagram_created, _diagram_id}, socket) do
     if socket.assigns.selected_document do
       diagrams = Diagrams.list_diagrams_for_document(socket.assigns.selected_document.id)

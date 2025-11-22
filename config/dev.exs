@@ -67,7 +67,19 @@ config :diagram_forge, DiagramForgeWeb.Endpoint,
 config :diagram_forge, dev_routes: true
 
 # Do not include metadata nor timestamps in development logs
-config :logger, :default_formatter, format: "[$level] $message\n"
+config :logger, :default_formatter, format: "[$level] $message $metadata\n"
+
+# Add a file handler
+config :logger, :default_handler,
+  config: [
+    file: ~c"logs/dev.log",
+    filesync_repeat_interval: 5000,
+    file_check: 5000,
+    max_no_bytes: 10_000_000,
+    # 10 MB
+    max_no_files: 5,
+    compress_on_rotate: true
+  ]
 
 # Set a higher stacktrace during development. Avoid configuring such
 # in production as building large stacktraces may be expensive.
