@@ -7,10 +7,12 @@ import Config
 # any compile-time configuration in here, as it won't be applied.
 # The block below contains prod specific runtime configuration.
 
-# Configure AI
-config :diagram_forge, DiagramForge.AI,
-  api_key: System.get_env("OPENAI_API_KEY"),
-  model: "gpt-4.1-mini"
+# Configure AI (skip in test environment to use test config)
+if config_env() != :test do
+  config :diagram_forge, DiagramForge.AI,
+    api_key: System.get_env("OPENAI_API_KEY"),
+    model: "gpt-4o-mini"
+end
 
 # ## Using releases
 #

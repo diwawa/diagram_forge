@@ -12,8 +12,6 @@ defmodule DiagramForge.AI.Client do
 
   alias DiagramForge.ErrorHandling.Retry
 
-  @cfg Application.compile_env(:diagram_forge, DiagramForge.AI)
-
   @doc """
   Calls the OpenAI chat completions API with the given messages.
 
@@ -44,20 +42,8 @@ defmodule DiagramForge.AI.Client do
 
   """
   def chat!(messages, opts \\ []) do
-    api_key = @cfg[:api_key] || raise "Missing OPENAI_API_KEY"
-    model = opts[:model] || @cfg[:model]
-    base_url = opts[:base_url] || "https://api.openai.com/v1"
-
-    retry_opts = [
-      max_attempts: opts[:max_attempts] || 3,
-      base_delay_ms: opts[:base_delay_ms] || 1000,
-      max_delay_ms: opts[:max_delay_ms] || 10_000,
-      context: %{
-        operation: "openai_chat_completion",
-        model: model,
-        message_count: length(messages)
-      }
-    ]
+    {api_key, model, base_url} = get_config(opts)
+    retry_opts = build_retry_opts(opts, model, messages)
 
     case Retry.with_retry(
            fn -> make_request(api_key, model, messages, base_url) end,
@@ -77,6 +63,27 @@ defmodule DiagramForge.AI.Client do
   end
 
   # Private functions
+
+  defp get_config(opts) do
+    config = Application.get_env(:diagram_forge, DiagramForge.AI, [])
+    api_key = opts[:api_key] || config[:api_key] || raise "Missing OPENAI_API_KEY"
+    model = opts[:model] || config[:model] || "gpt-4o-mini"
+    base_url = opts[:base_url] || "https://api.openai.com/v1"
+    {api_key, model, base_url}
+  end
+
+  defp build_retry_opts(opts, model, messages) do
+    [
+      max_attempts: opts[:max_attempts] || 3,
+      base_delay_ms: opts[:base_delay_ms] || 1000,
+      max_delay_ms: opts[:max_delay_ms] || 10_000,
+      context: %{
+        operation: "openai_chat_completion",
+        model: model,
+        message_count: length(messages)
+      }
+    ]
+  end
 
   defp make_request(api_key, model, messages, base_url) do
     body = %{
