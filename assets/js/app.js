@@ -67,11 +67,36 @@ const Mermaid = {
   }
 }
 
+// Copy to Clipboard Hook
+const CopyToClipboard = {
+  mounted() {
+    this.handleEvent("copy-to-clipboard", ({text}) => {
+      navigator.clipboard.writeText(text).then(() => {
+        // Visual feedback - briefly change button text
+        const originalHTML = this.el.innerHTML
+        this.el.innerHTML = `<svg class="w-3 h-3 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+        </svg>Copied!`
+        this.el.classList.remove("bg-green-800", "hover:bg-green-700")
+        this.el.classList.add("bg-green-600")
+
+        setTimeout(() => {
+          this.el.innerHTML = originalHTML
+          this.el.classList.remove("bg-green-600")
+          this.el.classList.add("bg-green-800", "hover:bg-green-700")
+        }, 2000)
+      }).catch(err => {
+        console.error("Failed to copy text: ", err)
+      })
+    })
+  }
+}
+
 const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
   params: {_csrf_token: csrfToken},
-  hooks: {...colocatedHooks, Mermaid},
+  hooks: {...colocatedHooks, Mermaid, CopyToClipboard},
 })
 
 // Show progress bar on live navigation and form submits

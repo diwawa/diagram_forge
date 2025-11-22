@@ -180,6 +180,19 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
   end
 
   @impl true
+  def handle_event("copy_share_link", _params, socket) do
+    case socket.assigns[:selected_diagram] do
+      nil ->
+        {:noreply, put_flash(socket, :error, "No diagram selected")}
+
+      diagram ->
+        # Build the full URL for the diagram
+        url = url(~p"/d/#{diagram.id}")
+        {:noreply, push_event(socket, "copy-to-clipboard", %{text: url})}
+    end
+  end
+
+  @impl true
   def handle_event("generate_diagrams", _params, socket) do
     selected_concept_ids = socket.assigns.selected_concepts
 
@@ -841,22 +854,49 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
                             </span>
                           <% end %>
                         </div>
-                        <%!-- Diagram Theme Switcher Button --%>
-                        <button
-                          phx-click="toggle_diagram_theme"
-                          class="px-3 py-1 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 rounded transition whitespace-nowrap"
-                          title={
-                            if @diagram_theme == "light",
-                              do: "Switch diagram to white on black",
-                              else: "Switch diagram to black on white"
-                          }
-                        >
-                          <%= if @diagram_theme == "light" do %>
-                            Theme: Black on White
-                          <% else %>
-                            Theme: White on Black
+                        <div class="flex gap-2">
+                          <%!-- Copy Share Link Button (only for owners) --%>
+                          <%= if Diagrams.can_edit_diagram?(@selected_diagram, @current_user) do %>
+                            <button
+                              phx-click="copy_share_link"
+                              phx-hook="CopyToClipboard"
+                              id="copy-share-link-btn"
+                              class="px-3 py-1 text-xs bg-green-800 hover:bg-green-700 text-white rounded transition whitespace-nowrap"
+                              title="Copy shareable link to clipboard"
+                            >
+                              <svg
+                                class="w-3 h-3 inline-block mr-1"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  stroke-linecap="round"
+                                  stroke-linejoin="round"
+                                  stroke-width="2"
+                                  d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                                />
+                              </svg>
+                              Copy Share Link
+                            </button>
                           <% end %>
-                        </button>
+                          <%!-- Diagram Theme Switcher Button --%>
+                          <button
+                            phx-click="toggle_diagram_theme"
+                            class="px-3 py-1 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 rounded transition whitespace-nowrap"
+                            title={
+                              if @diagram_theme == "light",
+                                do: "Switch diagram to white on black",
+                                else: "Switch diagram to black on white"
+                            }
+                          >
+                            <%= if @diagram_theme == "light" do %>
+                              Theme: Black on White
+                            <% else %>
+                              Theme: White on Black
+                            <% end %>
+                          </button>
+                        </div>
                       </div>
                     </div>
 
