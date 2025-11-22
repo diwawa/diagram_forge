@@ -936,65 +936,20 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
                           User prompt
                         <% end %>
                       </p>
-                      <div class="flex gap-2 mt-2 items-center justify-between">
-                        <div class="flex gap-2 flex-wrap">
-                          <span class="text-xs px-2 py-1 bg-slate-800 rounded">
-                            {@selected_diagram.domain}
+                      <div class="flex gap-2 mt-2 flex-wrap">
+                        <span class="text-xs px-2 py-1 bg-slate-800 rounded">
+                          {@selected_diagram.domain}
+                        </span>
+                        <%= for tag <- @selected_diagram.tags do %>
+                          <span class="text-xs px-2 py-1 bg-slate-700 rounded">
+                            {tag}
                           </span>
-                          <%= for tag <- @selected_diagram.tags do %>
-                            <span class="text-xs px-2 py-1 bg-slate-700 rounded">
-                              {tag}
-                            </span>
-                          <% end %>
-                        </div>
-                        <div class="flex gap-2">
-                          <%!-- Copy Share Link Button (only for owners) --%>
-                          <%= if Diagrams.can_edit_diagram?(@selected_diagram, @current_user) do %>
-                            <button
-                              phx-click="copy_share_link"
-                              phx-hook="CopyToClipboard"
-                              id="copy-share-link-btn"
-                              class="px-3 py-1 text-xs bg-green-800 hover:bg-green-700 text-white rounded transition whitespace-nowrap"
-                              title="Copy shareable link to clipboard"
-                            >
-                              <svg
-                                class="w-3 h-3 inline-block mr-1"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path
-                                  stroke-linecap="round"
-                                  stroke-linejoin="round"
-                                  stroke-width="2"
-                                  d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
-                                />
-                              </svg>
-                              Copy Share Link
-                            </button>
-                          <% end %>
-                          <%!-- Diagram Theme Switcher Button --%>
-                          <button
-                            phx-click="toggle_diagram_theme"
-                            class="px-3 py-1 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 rounded transition whitespace-nowrap"
-                            title={
-                              if @diagram_theme == "light",
-                                do: "Switch diagram to white on black",
-                                else: "Switch diagram to black on white"
-                            }
-                          >
-                            <%= if @diagram_theme == "light" do %>
-                              Theme: Black on White
-                            <% else %>
-                              Theme: White on Black
-                            <% end %>
-                          </button>
-                        </div>
+                        <% end %>
                       </div>
                     </div>
 
                     <%!-- Right: Notes --%>
-                    <div>
+                    <div class="flex flex-col justify-between">
                       <%= if @selected_diagram.notes_md do %>
                         <div class="text-sm text-slate-400">
                           <div class="font-semibold text-slate-300 mb-1.5">Notes</div>
@@ -1003,6 +958,52 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
                           </div>
                         </div>
                       <% end %>
+
+                      <%!-- Action buttons row --%>
+                      <div class="flex gap-2 mt-3 justify-end">
+                        <%!-- Diagram Theme Switcher Button --%>
+                        <button
+                          phx-click="toggle_diagram_theme"
+                          class="px-3 py-1 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 rounded transition whitespace-nowrap"
+                          title={
+                            if @diagram_theme == "light",
+                              do: "Switch diagram to white on black",
+                              else: "Switch diagram to black on white"
+                          }
+                        >
+                          <%= if @diagram_theme == "light" do %>
+                            Theme: Black on White
+                          <% else %>
+                            Theme: White on Black
+                          <% end %>
+                        </button>
+
+                        <%!-- Copy Share Link Button (only for owners) --%>
+                        <%= if Diagrams.can_edit_diagram?(@selected_diagram, @current_user) do %>
+                          <button
+                            phx-click="copy_share_link"
+                            phx-hook="CopyToClipboard"
+                            id="copy-share-link-btn"
+                            class="px-3 py-1 text-xs bg-green-800 hover:bg-green-700 text-white rounded transition whitespace-nowrap"
+                            title="Copy shareable link to clipboard"
+                          >
+                            <svg
+                              class="w-3 h-3 inline-block mr-1"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                              />
+                            </svg>
+                            Copy Share Link
+                          </button>
+                        <% end %>
+                      </div>
                     </div>
                   </div>
 
