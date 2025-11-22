@@ -25,8 +25,8 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
      |> assign(:selected_document, nil)
      |> assign(:concepts_page, 1)
      |> assign(:concepts_page_size, 10)
-     |> assign(:concepts_total, count_concepts())
-     |> assign(:concepts, list_concepts(page: 1, page_size: 10))
+     |> assign(:concepts_total, 0)
+     |> assign(:concepts, [])
      |> assign(:category_filter, nil)
      |> assign(:selected_concepts, MapSet.new())
      |> assign(:expanded_concepts, MapSet.new())
@@ -45,6 +45,19 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
        max_entries: 1,
        max_file_size: 50_000_000
      )}
+  end
+
+  @impl true
+  def handle_params(params, _url, socket) do
+    page = parse_int(params["page"], 1)
+    page_size = parse_int(params["page_size"], 10)
+
+    {:noreply,
+     socket
+     |> assign(:concepts_page, page)
+     |> assign(:concepts_page_size, page_size)
+     |> assign(:concepts_total, count_concepts())
+     |> assign(:concepts, list_concepts(page: page, page_size: page_size))}
   end
 
   @impl true
@@ -207,30 +220,14 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
 
   @impl true
   def handle_event("concepts_change_page", %{"page" => page}, socket) do
-    page = String.to_integer(page)
-    page_size = socket.assigns.concepts_page_size
-
-    concepts = list_concepts(page: page, page_size: page_size)
-
     {:noreply,
-     socket
-     |> assign(:concepts_page, page)
-     |> assign(:concepts, concepts)}
+     push_patch(socket, to: ~p"/?page=#{page}&page_size=#{socket.assigns.concepts_page_size}")}
   end
 
   @impl true
   def handle_event("concepts_change_page_size", %{"page_size" => page_size}, socket) do
-    page_size = String.to_integer(page_size)
     # Reset to page 1 when changing page size
-    page = 1
-
-    concepts = list_concepts(page: page, page_size: page_size)
-
-    {:noreply,
-     socket
-     |> assign(:concepts_page, page)
-     |> assign(:concepts_page_size, page_size)
-     |> assign(:concepts, concepts)}
+    {:noreply, push_patch(socket, to: ~p"/?page=1&page_size=#{page_size}")}
   end
 
   @impl true
@@ -448,10 +445,9 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
               <%!-- Pagination Controls --%>
               <% total_pages = ceil(@concepts_total / @concepts_page_size) %>
               <div class="flex items-center justify-between mb-3 pb-3 border-b border-slate-800 text-xs">
-                <div class="flex items-center gap-2">
+                <form phx-change="concepts_change_page_size" class="flex items-center gap-2">
                   <span class="text-slate-400">Page size:</span>
                   <select
-                    phx-change="concepts_change_page_size"
                     name="page_size"
                     class="bg-slate-800 text-slate-300 rounded px-2 py-1"
                   >
@@ -461,7 +457,7 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
                       </option>
                     <% end %>
                   </select>
-                </div>
+                </form>
                 <div class="flex items-center gap-2">
                   <span class="text-slate-400">
                     Page {@concepts_page} of {total_pages} ({@concepts_total} total)
@@ -832,6 +828,17 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
       socket
     end
   end
+
+  defp parse_int(nil, default), do: default
+
+  defp parse_int(value, default) when is_binary(value) do
+    case Integer.parse(value) do
+      {int, _} -> int
+      :error -> default
+    end
+  end
+
+  defp parse_int(value, _default) when is_integer(value), do: value
 
   defp format_status(status) do
     case status do
