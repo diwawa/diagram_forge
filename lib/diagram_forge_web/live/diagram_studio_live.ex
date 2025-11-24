@@ -15,7 +15,7 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
   on_mount DiagramForgeWeb.UserLive
 
   @impl true
-  def mount(_params, _session, socket) do
+  def mount(params, _session, socket) do
     if connected?(socket) do
       Phoenix.PubSub.subscribe(DiagramForge.PubSub, "documents")
       Phoenix.PubSub.subscribe(DiagramForge.PubSub, "diagrams")
@@ -25,36 +25,63 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
 
     current_user = socket.assigns[:current_user]
 
-    {:ok,
-     socket
-     |> assign(:current_user, current_user)
-     |> assign(:documents, list_documents())
-     |> assign(:selected_document, nil)
-     |> assign(:active_tag_filter, [])
-     |> assign(:available_tags, [])
-     |> assign(:tag_counts, %{})
-     |> assign(:pinned_filters, [])
-     |> assign(:owned_diagrams, [])
-     |> assign(:bookmarked_diagrams, [])
-     |> assign(:public_diagrams, [])
-     |> assign(:selected_diagram, nil)
-     |> assign(:generated_diagram, nil)
-     |> assign(:prompt, "")
-     |> assign(:uploaded_files, [])
-     |> assign(:generating, false)
-     |> assign(:diagram_theme, "dark")
-     |> assign(:show_save_filter_modal, false)
-     |> assign(:editing_filter, nil)
-     |> assign(:editing_diagram, nil)
-     |> assign(:new_tag_input, "")
-     |> load_diagrams()
-     |> load_tags()
-     |> load_filters()
-     |> allow_upload(:document,
-       accept: ~w(.pdf .md .markdown),
-       max_entries: 1,
-       max_file_size: 50_000_000
-     )}
+    socket =
+      socket
+      |> assign(:current_user, current_user)
+      |> assign(:documents, list_documents())
+      |> assign(:selected_document, nil)
+      |> assign(:active_tag_filter, [])
+      |> assign(:available_tags, [])
+      |> assign(:tag_counts, %{})
+      |> assign(:pinned_filters, [])
+      |> assign(:owned_diagrams, [])
+      |> assign(:bookmarked_diagrams, [])
+      |> assign(:public_diagrams, [])
+      |> assign(:selected_diagram, nil)
+      |> assign(:generated_diagram, nil)
+      |> assign(:prompt, "")
+      |> assign(:uploaded_files, [])
+      |> assign(:generating, false)
+      |> assign(:diagram_theme, "dark")
+      |> assign(:show_save_filter_modal, false)
+      |> assign(:editing_filter, nil)
+      |> assign(:editing_diagram, nil)
+      |> assign(:new_tag_input, "")
+      |> load_diagrams()
+      |> load_tags()
+      |> load_filters()
+      |> allow_upload(:document,
+        accept: ~w(.pdf .md .markdown),
+        max_entries: 1,
+        max_file_size: 50_000_000
+      )
+
+    # Handle permalink access via /d/:id
+    socket =
+      case params do
+        %{"id" => id} ->
+          try do
+            diagram = Diagrams.get_diagram!(id)
+
+            if Diagrams.can_view_diagram?(diagram, current_user) do
+              socket |> assign(:selected_diagram, diagram)
+            else
+              socket
+              |> put_flash(:error, "You don't have permission to view this diagram")
+              |> push_navigate(to: "/")
+            end
+          rescue
+            Ecto.NoResultsError ->
+              socket
+              |> put_flash(:error, "Diagram not found")
+              |> push_navigate(to: "/")
+          end
+
+        _ ->
+          socket
+      end
+
+    {:ok, socket}
   end
 
   @impl true
@@ -1172,6 +1199,29 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
             <div class="bg-slate-900 rounded-xl p-6 flex-1 overflow-auto">
               <%= if @selected_diagram do %>
                 <div class="space-y-4">
+                  <%!-- Visibility Banner --%>
+                  <div class={[
+                    "px-4 py-2 rounded-lg border flex items-center justify-between",
+                    @selected_diagram.visibility == :private && "bg-red-900/20 border-red-700/50",
+                    @selected_diagram.visibility == :unlisted &&
+                      "bg-yellow-900/20 border-yellow-700/50",
+                    @selected_diagram.visibility == :public && "bg-green-900/20 border-green-700/50"
+                  ]}>
+                    <div class="flex items-center gap-2">
+                      <span class="text-sm font-medium">
+                        Visibility:
+                        <%= case @selected_diagram.visibility do %>
+                          <% :private -> %>
+                            <span class="text-red-400">Private</span> - Only you can view
+                          <% :unlisted -> %>
+                            <span class="text-yellow-400">Unlisted</span> - Anyone with the link
+                          <% :public -> %>
+                            <span class="text-green-400">Public</span> - Discoverable by all
+                        <% end %>
+                      </span>
+                    </div>
+                  </div>
+
                   <div class="grid grid-cols-2 gap-6">
                     <div>
                       <h2 class="text-2xl font-semibold mb-2">{@selected_diagram.title}</h2>
