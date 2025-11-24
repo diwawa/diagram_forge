@@ -119,6 +119,8 @@ defmodule DiagramForge.Diagrams do
   @doc """
   Checks if a user owns a diagram.
   """
+  def user_owns_diagram?(nil, _user_id), do: false
+
   def user_owns_diagram?(diagram_id, user_id) do
     Repo.exists?(
       from ud in UserDiagram,
@@ -132,6 +134,8 @@ defmodule DiagramForge.Diagrams do
   @doc """
   Checks if a user has bookmarked a diagram.
   """
+  def user_bookmarked_diagram?(nil, _user_id), do: false
+
   def user_bookmarked_diagram?(diagram_id, user_id) do
     Repo.exists?(
       from ud in UserDiagram,

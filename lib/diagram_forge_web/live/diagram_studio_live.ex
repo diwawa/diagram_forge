@@ -45,6 +45,7 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
      |> assign(:diagram_theme, "dark")
      |> assign(:show_save_filter_modal, false)
      |> assign(:editing_filter, nil)
+     |> assign(:editing_diagram, nil)
      |> assign(:new_tag_input, "")
      |> load_diagrams()
      |> load_tags()
@@ -267,6 +268,138 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
 
       {:error, _reason} ->
         {:noreply, put_flash(socket, :error, "Failed to fork diagram")}
+    end
+  end
+
+  @impl true
+  def handle_event("bookmark_diagram", %{"id" => id}, socket) do
+    user_id = socket.assigns.current_user.id
+
+    case Diagrams.bookmark_diagram(id, user_id) do
+      {:ok, _} ->
+        socket =
+          socket
+          |> load_diagrams()
+          |> put_flash(:info, "Diagram bookmarked successfully")
+
+        {:noreply, socket}
+
+      {:error, _reason} ->
+        {:noreply, put_flash(socket, :error, "Failed to bookmark diagram")}
+    end
+  end
+
+  @impl true
+  def handle_event("remove_bookmark", %{"id" => id}, socket) do
+    user_id = socket.assigns.current_user.id
+
+    :ok = Diagrams.remove_diagram_bookmark(id, user_id)
+
+    socket =
+      socket
+      |> load_diagrams()
+      |> put_flash(:info, "Diagram removed from your collection")
+
+    {:noreply, socket}
+  end
+
+  # Diagram edit/delete actions
+
+  @impl true
+  def handle_event("edit_diagram", %{"id" => id}, socket) do
+    diagram = Diagrams.get_diagram!(id)
+
+    if Diagrams.can_edit_diagram?(diagram, socket.assigns.current_user) do
+      {:noreply, assign(socket, :editing_diagram, diagram)}
+    else
+      {:noreply, put_flash(socket, :error, "You don't have permission to edit this diagram")}
+    end
+  end
+
+  @impl true
+  def handle_event("cancel_edit_diagram", _params, socket) do
+    {:noreply, assign(socket, :editing_diagram, nil)}
+  end
+
+  @impl true
+  def handle_event("save_diagram_edit", %{"diagram" => params}, socket) do
+    diagram = socket.assigns.editing_diagram
+    user_id = socket.assigns.current_user.id
+
+    # Convert tags from comma-separated string to array if present
+    params =
+      if tags_str = params["tags"] do
+        tags = String.split(tags_str, ",") |> Enum.map(&String.trim/1) |> Enum.reject(&(&1 == ""))
+        Map.put(params, "tags", tags)
+      else
+        params
+      end
+
+    # Convert visibility to atom if present
+    params =
+      if visibility = params["visibility"] do
+        Map.put(params, "visibility", String.to_existing_atom(visibility))
+      else
+        params
+      end
+
+    case Diagrams.update_diagram(diagram, params, user_id) do
+      {:ok, _updated} ->
+        socket =
+          socket
+          |> assign(:editing_diagram, nil)
+          |> load_diagrams()
+          |> load_tags()
+          |> put_flash(:info, "Diagram updated successfully")
+
+        {:noreply, socket}
+
+      {:error, %Ecto.Changeset{} = changeset} ->
+        {:noreply, assign(socket, :diagram_changeset, changeset)}
+
+      {:error, :unauthorized} ->
+        {:noreply, put_flash(socket, :error, "Unauthorized")}
+    end
+  end
+
+  @impl true
+  def handle_event("delete_diagram", %{"id" => id}, socket) do
+    diagram = Diagrams.get_diagram!(id)
+    user_id = socket.assigns.current_user.id
+
+    case Diagrams.delete_diagram(diagram, user_id) do
+      {:ok, _} ->
+        socket =
+          socket
+          |> assign(:selected_diagram, nil)
+          |> load_diagrams()
+          |> put_flash(:info, "Diagram deleted successfully")
+
+        {:noreply, socket}
+
+      {:error, :unauthorized} ->
+        {:noreply, put_flash(socket, :error, "Unauthorized")}
+    end
+  end
+
+  @impl true
+  def handle_event("change_visibility", %{"id" => id, "visibility" => visibility}, socket) do
+    diagram = Diagrams.get_diagram!(id)
+    user_id = socket.assigns.current_user.id
+    visibility_atom = String.to_existing_atom(visibility)
+
+    case Diagrams.update_diagram(diagram, %{visibility: visibility_atom}, user_id) do
+      {:ok, updated} ->
+        socket =
+          socket
+          |> assign(:selected_diagram, updated)
+          |> load_diagrams()
+          |> put_flash(:info, "Visibility updated to #{visibility}")
+
+        {:noreply, socket}
+
+      {:error, :unauthorized} ->
+        {:noreply, put_flash(socket, :error, "Unauthorized")}
     end
   end
 
@@ -999,7 +1132,7 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
                         </div>
                       <% end %>
 
-                      <div class="flex gap-2 mt-3">
+                      <div class="flex flex-wrap gap-2 mt-3">
                         <button
                           phx-click="toggle_diagram_theme"
                           class="px-3 py-1 text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 rounded transition whitespace-nowrap"
@@ -1020,13 +1153,71 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
                           Copy Share Link
                         </button>
 
-                        <button
-                          phx-click="fork_diagram"
-                          phx-value-id={@selected_diagram.id}
-                          class="px-3 py-1 text-xs bg-purple-800 hover:bg-purple-700 text-white rounded transition whitespace-nowrap"
-                        >
-                          Fork
-                        </button>
+                        <%= if @current_user && Diagrams.can_edit_diagram?(@selected_diagram, @current_user) do %>
+                          <button
+                            phx-click="edit_diagram"
+                            phx-value-id={@selected_diagram.id}
+                            class="px-3 py-1 text-xs bg-blue-800 hover:bg-blue-700 text-white rounded transition whitespace-nowrap"
+                          >
+                            Edit
+                          </button>
+
+                          <button
+                            phx-click="delete_diagram"
+                            phx-value-id={@selected_diagram.id}
+                            data-confirm="Are you sure you want to delete this diagram?"
+                            class="px-3 py-1 text-xs bg-red-800 hover:bg-red-700 text-white rounded transition whitespace-nowrap"
+                          >
+                            Delete
+                          </button>
+                        <% end %>
+
+                        <%= if @current_user do %>
+                          <%= if Diagrams.user_owns_diagram?(@selected_diagram.id, @current_user.id) do %>
+                            <%!-- Owner can fork their own diagram --%>
+                            <button
+                              phx-click="fork_diagram"
+                              phx-value-id={@selected_diagram.id}
+                              class="px-3 py-1 text-xs bg-purple-800 hover:bg-purple-700 text-white rounded transition whitespace-nowrap"
+                            >
+                              Fork
+                            </button>
+                          <% else %>
+                            <%= if Diagrams.user_bookmarked_diagram?(@selected_diagram.id, @current_user.id) do %>
+                              <button
+                                phx-click="remove_bookmark"
+                                phx-value-id={@selected_diagram.id}
+                                class="px-3 py-1 text-xs bg-amber-800 hover:bg-amber-700 text-white rounded transition whitespace-nowrap"
+                              >
+                                Remove Bookmark
+                              </button>
+                            <% else %>
+                              <button
+                                phx-click="bookmark_diagram"
+                                phx-value-id={@selected_diagram.id}
+                                class="px-3 py-1 text-xs bg-green-800 hover:bg-green-700 text-white rounded transition whitespace-nowrap"
+                              >
+                                Bookmark
+                              </button>
+                            <% end %>
+
+                            <button
+                              phx-click="fork_diagram"
+                              phx-value-id={@selected_diagram.id}
+                              class="px-3 py-1 text-xs bg-purple-800 hover:bg-purple-700 text-white rounded transition whitespace-nowrap"
+                            >
+                              Fork
+                            </button>
+                          <% end %>
+                        <% else %>
+                          <button
+                            phx-click="fork_diagram"
+                            phx-value-id={@selected_diagram.id}
+                            class="px-3 py-1 text-xs bg-purple-800 hover:bg-purple-700 text-white rounded transition whitespace-nowrap"
+                          >
+                            Fork
+                          </button>
+                        <% end %>
                       </div>
                     </div>
                   </div>
@@ -1185,6 +1376,101 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
                   class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded transition"
                 >
                   Save Filter
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      <% end %>
+
+      <%!-- Edit Diagram Modal --%>
+      <%= if @editing_diagram do %>
+        <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div class="bg-slate-900 rounded-lg p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto mx-4">
+            <h2 class="text-2xl font-bold mb-4">Edit Diagram</h2>
+
+            <form phx-submit="save_diagram_edit" id="edit-diagram-form" class="space-y-4">
+              <div>
+                <label class="block text-sm font-medium mb-2">Title</label>
+                <input
+                  type="text"
+                  name="diagram[title]"
+                  value={@editing_diagram.title}
+                  required
+                  class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded focus:border-blue-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label class="block text-sm font-medium mb-2">Mermaid Source</label>
+                <textarea
+                  name="diagram[diagram_source]"
+                  required
+                  rows="15"
+                  class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded focus:border-blue-500 focus:outline-none font-mono text-sm"
+                >{@editing_diagram.diagram_source}</textarea>
+              </div>
+
+              <div>
+                <label class="block text-sm font-medium mb-2">Summary</label>
+                <textarea
+                  name="diagram[summary]"
+                  rows="3"
+                  class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded focus:border-blue-500 focus:outline-none"
+                >{@editing_diagram.summary}</textarea>
+              </div>
+
+              <div>
+                <label class="block text-sm font-medium mb-2">Notes (Markdown)</label>
+                <textarea
+                  name="diagram[notes_md]"
+                  rows="5"
+                  class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded focus:border-blue-500 focus:outline-none"
+                >{@editing_diagram.notes_md}</textarea>
+              </div>
+
+              <div>
+                <label class="block text-sm font-medium mb-2">Tags (comma-separated)</label>
+                <input
+                  type="text"
+                  name="diagram[tags]"
+                  value={Enum.join(@editing_diagram.tags, ", ")}
+                  placeholder="elixir, oauth, patterns"
+                  class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded focus:border-blue-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label class="block text-sm font-medium mb-2">Visibility</label>
+                <select
+                  name="diagram[visibility]"
+                  class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded focus:border-blue-500 focus:outline-none"
+                >
+                  <option value="private" selected={@editing_diagram.visibility == :private}>
+                    Private (only you)
+                  </option>
+                  <option value="unlisted" selected={@editing_diagram.visibility == :unlisted}>
+                    Unlisted (anyone with link)
+                  </option>
+                  <option value="public" selected={@editing_diagram.visibility == :public}>
+                    Public (discoverable)
+                  </option>
+                </select>
+              </div>
+
+              <div class="flex justify-end gap-2 mt-6">
+                <button
+                  type="button"
+                  phx-click="cancel_edit_diagram"
+                  class="px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded transition"
+                >
+                  Save Changes
                 </button>
               </div>
             </form>
