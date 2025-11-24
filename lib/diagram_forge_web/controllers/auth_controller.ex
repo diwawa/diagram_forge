@@ -84,10 +84,8 @@ defmodule DiagramForgeWeb.AuthController do
     # Convert string keys to atom keys for Ecto compatibility
     atomized_attrs = atomize_diagram_keys(diagram_attrs)
 
-    # Create a diagram struct for saving
-    # In the future when we have user_diagrams join table, we'll use create_diagram_for_user
-    diagram = %Diagrams.Diagram{
-      user_id: user.id,
+    # Create diagram attrs
+    diagram_attrs = %{
       title: atomized_attrs.title,
       slug: atomized_attrs.slug,
       diagram_source: atomized_attrs.diagram_source,
@@ -96,7 +94,7 @@ defmodule DiagramForgeWeb.AuthController do
       tags: atomized_attrs.tags || []
     }
 
-    case Diagrams.save_generated_diagram(diagram) do
+    case Diagrams.create_diagram_for_user(diagram_attrs, user.id) do
       {:ok, saved_diagram} ->
         conn
         |> delete_session(:pending_diagram_save)

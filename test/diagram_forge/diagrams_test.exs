@@ -7,9 +7,12 @@ defmodule DiagramForge.DiagramsTest do
   describe "list_available_tags/1" do
     test "returns unique tags from all diagrams" do
       user = fixture(:user)
-      fixture(:diagram, user: user, tags: ["elixir", "otp"])
-      fixture(:diagram, user: user, tags: ["elixir", "phoenix"])
-      fixture(:diagram, user: user, tags: ["rust", "async"])
+      d1 = fixture(:diagram, tags: ["elixir", "otp"])
+      d2 = fixture(:diagram, tags: ["elixir", "phoenix"])
+      d3 = fixture(:diagram, tags: ["rust", "async"])
+      Diagrams.assign_diagram_to_user(d1.id, user.id)
+      Diagrams.assign_diagram_to_user(d2.id, user.id)
+      Diagrams.assign_diagram_to_user(d3.id, user.id)
 
       tags = Diagrams.list_available_tags(user.id)
 
@@ -23,7 +26,8 @@ defmodule DiagramForge.DiagramsTest do
 
     test "returns sorted tags" do
       user = fixture(:user)
-      fixture(:diagram, user: user, tags: ["zulu", "alpha", "mike"])
+      d = fixture(:diagram, tags: ["zulu", "alpha", "mike"])
+      Diagrams.assign_diagram_to_user(d.id, user.id)
 
       tags = Diagrams.list_available_tags(user.id)
 
@@ -40,8 +44,10 @@ defmodule DiagramForge.DiagramsTest do
 
     test "handles diagrams with empty tags" do
       user = fixture(:user)
-      fixture(:diagram, user: user, tags: [])
-      fixture(:diagram, user: user, tags: ["test"])
+      d1 = fixture(:diagram, tags: [])
+      d2 = fixture(:diagram, tags: ["test"])
+      Diagrams.assign_diagram_to_user(d1.id, user.id)
+      Diagrams.assign_diagram_to_user(d2.id, user.id)
 
       tags = Diagrams.list_available_tags(user.id)
 
@@ -52,9 +58,12 @@ defmodule DiagramForge.DiagramsTest do
   describe "get_tag_counts/1" do
     test "returns correct count for each tag" do
       user = fixture(:user)
-      fixture(:diagram, user: user, tags: ["elixir", "otp"])
-      fixture(:diagram, user: user, tags: ["elixir", "phoenix"])
-      fixture(:diagram, user: user, tags: ["elixir"])
+      d1 = fixture(:diagram, tags: ["elixir", "otp"])
+      d2 = fixture(:diagram, tags: ["elixir", "phoenix"])
+      d3 = fixture(:diagram, tags: ["elixir"])
+      Diagrams.assign_diagram_to_user(d1.id, user.id)
+      Diagrams.assign_diagram_to_user(d2.id, user.id)
+      Diagrams.assign_diagram_to_user(d3.id, user.id)
 
       counts = Diagrams.get_tag_counts(user.id)
 
@@ -73,8 +82,10 @@ defmodule DiagramForge.DiagramsTest do
 
     test "handles diagrams with empty tags" do
       user = fixture(:user)
-      fixture(:diagram, user: user, tags: [])
-      fixture(:diagram, user: user, tags: ["test"])
+      d1 = fixture(:diagram, tags: [])
+      d2 = fixture(:diagram, tags: ["test"])
+      Diagrams.assign_diagram_to_user(d1.id, user.id)
+      Diagrams.assign_diagram_to_user(d2.id, user.id)
 
       counts = Diagrams.get_tag_counts(user.id)
 
@@ -384,8 +395,10 @@ defmodule DiagramForge.DiagramsTest do
   describe "list_diagrams_by_tags/3" do
     test "returns all diagrams when tags list is empty" do
       user = fixture(:user)
-      diagram1 = fixture(:diagram, user: user, tags: ["elixir"])
-      diagram2 = fixture(:diagram, user: user, tags: ["rust"])
+      diagram1 = fixture(:diagram, tags: ["elixir"])
+      diagram2 = fixture(:diagram, tags: ["rust"])
+      Diagrams.assign_diagram_to_user(diagram1.id, user.id)
+      Diagrams.assign_diagram_to_user(diagram2.id, user.id)
 
       diagrams = Diagrams.list_diagrams_by_tags(user.id, [], :all)
 
@@ -397,8 +410,10 @@ defmodule DiagramForge.DiagramsTest do
 
     test "filters diagrams by single tag" do
       user = fixture(:user)
-      elixir_diagram = fixture(:diagram, user: user, tags: ["elixir", "otp"])
-      _rust_diagram = fixture(:diagram, user: user, tags: ["rust"])
+      elixir_diagram = fixture(:diagram, tags: ["elixir", "otp"])
+      rust_diagram = fixture(:diagram, tags: ["rust"])
+      Diagrams.assign_diagram_to_user(elixir_diagram.id, user.id)
+      Diagrams.assign_diagram_to_user(rust_diagram.id, user.id)
 
       diagrams = Diagrams.list_diagrams_by_tags(user.id, ["elixir"], :all)
 
@@ -408,9 +423,12 @@ defmodule DiagramForge.DiagramsTest do
 
     test "filters diagrams by multiple tags with AND logic" do
       user = fixture(:user)
-      both_tags = fixture(:diagram, user: user, tags: ["elixir", "phoenix"])
-      _only_elixir = fixture(:diagram, user: user, tags: ["elixir"])
-      _only_phoenix = fixture(:diagram, user: user, tags: ["phoenix"])
+      both_tags = fixture(:diagram, tags: ["elixir", "phoenix"])
+      only_elixir = fixture(:diagram, tags: ["elixir"])
+      only_phoenix = fixture(:diagram, tags: ["phoenix"])
+      Diagrams.assign_diagram_to_user(both_tags.id, user.id)
+      Diagrams.assign_diagram_to_user(only_elixir.id, user.id)
+      Diagrams.assign_diagram_to_user(only_phoenix.id, user.id)
 
       diagrams = Diagrams.list_diagrams_by_tags(user.id, ["elixir", "phoenix"], :all)
 
@@ -420,8 +438,10 @@ defmodule DiagramForge.DiagramsTest do
 
     test "returns empty list when no diagrams match all tags" do
       user = fixture(:user)
-      fixture(:diagram, user: user, tags: ["elixir"])
-      fixture(:diagram, user: user, tags: ["phoenix"])
+      d1 = fixture(:diagram, tags: ["elixir"])
+      d2 = fixture(:diagram, tags: ["phoenix"])
+      Diagrams.assign_diagram_to_user(d1.id, user.id)
+      Diagrams.assign_diagram_to_user(d2.id, user.id)
 
       diagrams = Diagrams.list_diagrams_by_tags(user.id, ["elixir", "phoenix"], :all)
 
@@ -431,9 +451,11 @@ defmodule DiagramForge.DiagramsTest do
     test "returns diagrams in descending order by inserted_at" do
       user = fixture(:user)
       # Insert in order but want them returned newest first
-      old_diagram = fixture(:diagram, user: user, tags: ["test"])
+      old_diagram = fixture(:diagram, tags: ["test"])
       :timer.sleep(10)
-      new_diagram = fixture(:diagram, user: user, tags: ["test"])
+      new_diagram = fixture(:diagram, tags: ["test"])
+      Diagrams.assign_diagram_to_user(old_diagram.id, user.id)
+      Diagrams.assign_diagram_to_user(new_diagram.id, user.id)
 
       diagrams = Diagrams.list_diagrams_by_tags(user.id, ["test"], :all)
 
@@ -449,8 +471,10 @@ defmodule DiagramForge.DiagramsTest do
     test "returns diagrams matching filter's tag_filter" do
       user = fixture(:user)
       filter = fixture(:saved_filter, user: user, tag_filter: ["elixir", "phoenix"])
-      matching = fixture(:diagram, user: user, tags: ["elixir", "phoenix", "web"])
-      _non_matching = fixture(:diagram, user: user, tags: ["elixir"])
+      matching = fixture(:diagram, tags: ["elixir", "phoenix", "web"])
+      non_matching = fixture(:diagram, tags: ["elixir"])
+      Diagrams.assign_diagram_to_user(matching.id, user.id)
+      Diagrams.assign_diagram_to_user(non_matching.id, user.id)
 
       diagrams = Diagrams.list_diagrams_by_saved_filter(user.id, filter)
 
@@ -461,8 +485,10 @@ defmodule DiagramForge.DiagramsTest do
     test "returns all diagrams when filter has empty tag_filter" do
       user = fixture(:user)
       filter = fixture(:saved_filter, user: user, tag_filter: [])
-      diagram1 = fixture(:diagram, user: user, tags: ["elixir"])
-      diagram2 = fixture(:diagram, user: user, tags: ["rust"])
+      diagram1 = fixture(:diagram, tags: ["elixir"])
+      diagram2 = fixture(:diagram, tags: ["rust"])
+      Diagrams.assign_diagram_to_user(diagram1.id, user.id)
+      Diagrams.assign_diagram_to_user(diagram2.id, user.id)
 
       diagrams = Diagrams.list_diagrams_by_saved_filter(user.id, filter)
 
@@ -477,9 +503,12 @@ defmodule DiagramForge.DiagramsTest do
     test "returns correct count of matching diagrams" do
       user = fixture(:user)
       filter = fixture(:saved_filter, user: user, tag_filter: ["elixir"])
-      fixture(:diagram, user: user, tags: ["elixir", "otp"])
-      fixture(:diagram, user: user, tags: ["elixir", "phoenix"])
-      fixture(:diagram, user: user, tags: ["rust"])
+      d1 = fixture(:diagram, tags: ["elixir", "otp"])
+      d2 = fixture(:diagram, tags: ["elixir", "phoenix"])
+      d3 = fixture(:diagram, tags: ["rust"])
+      Diagrams.assign_diagram_to_user(d1.id, user.id)
+      Diagrams.assign_diagram_to_user(d2.id, user.id)
+      Diagrams.assign_diagram_to_user(d3.id, user.id)
 
       count = Diagrams.get_saved_filter_count(user.id, filter)
 
@@ -539,8 +568,9 @@ defmodule DiagramForge.DiagramsTest do
       assert {:ok, forked} = Diagrams.fork_diagram(original.id, user.id)
 
       assert forked.slug != original.slug
-      assert String.contains?(forked.slug, "original-slug")
-      assert String.contains?(forked.slug, "fork")
+      assert String.starts_with?(forked.slug, "original-slug-")
+      # Should have additional characters after the dash (random hex string)
+      assert String.length(forked.slug) > String.length("original-slug-")
     end
 
     test "sets forked_from_id to original" do

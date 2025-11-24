@@ -5,6 +5,7 @@ defmodule DiagramForge.Repo.Migrations.CreateDiagrams do
     create table(:diagrams, primary_key: false) do
       add :id, :binary_id, primary_key: true
       add :document_id, references(:documents, type: :binary_id, on_delete: :nilify_all)
+      add :forked_from_id, references(:diagrams, type: :binary_id, on_delete: :nilify_all)
       add :slug, :string, null: false
       add :title, :string, null: false
       add :tags, {:array, :string}, default: []
@@ -12,12 +13,15 @@ defmodule DiagramForge.Repo.Migrations.CreateDiagrams do
       add :diagram_source, :text, null: false
       add :summary, :text
       add :notes_md, :text
+      add :visibility, :string, null: false, default: "unlisted"
 
       timestamps()
     end
 
     create unique_index(:diagrams, [:slug])
     create index(:diagrams, [:document_id])
+    create index(:diagrams, [:forked_from_id])
+    create index(:diagrams, [:visibility])
     # GIN index for efficient tag queries
     create index(:diagrams, [:tags], using: :gin)
   end

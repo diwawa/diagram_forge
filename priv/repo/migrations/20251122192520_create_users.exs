@@ -11,6 +11,7 @@ defmodule DiagramForge.Repo.Migrations.CreateUsers do
       add :provider_token, :binary
       add :avatar_url, :string
       add :last_sign_in_at, :utc_datetime
+      add :show_public_diagrams, :boolean, default: false, null: false
 
       timestamps()
     end

@@ -35,12 +35,16 @@ defmodule DiagramForge.Diagrams.DiagramTest do
       end
     end
 
-    test "optionally belongs to a user" do
-      user = fixture(:user)
-      diagram = fixture(:diagram, user: user)
+    test "has many-to-many association with users" do
+      alias DiagramForge.Diagrams
 
-      loaded = Repo.preload(diagram, :user)
-      assert loaded.user.id == user.id
+      user = fixture(:user)
+      diagram = fixture(:diagram)
+      Diagrams.assign_diagram_to_user(diagram.id, user.id)
+
+      loaded = Repo.preload(diagram, :users)
+      assert length(loaded.users) == 1
+      assert hd(loaded.users).id == user.id
     end
 
     test "optionally belongs to a document" do
@@ -52,11 +56,12 @@ defmodule DiagramForge.Diagrams.DiagramTest do
     end
 
     test "creates diagram with all fields" do
+      alias DiagramForge.Diagrams
+
       user = fixture(:user)
 
-      changeset =
-        build(:diagram,
-          user: user,
+      diagram =
+        fixture(:diagram,
           title: "GenServer Flow",
           slug: "genserver-flow",
           tags: ["otp", "concurrency", "elixir"],
@@ -66,8 +71,8 @@ defmodule DiagramForge.Diagrams.DiagramTest do
           notes_md: "- Call\n- Cast\n- Info"
         )
 
-      assert {:ok, diagram} = Repo.insert(changeset)
-      assert diagram.user_id == user.id
+      Diagrams.assign_diagram_to_user(diagram.id, user.id)
+
       assert diagram.title == "GenServer Flow"
       assert diagram.slug == "genserver-flow"
       assert diagram.tags == ["otp", "concurrency", "elixir"]
@@ -75,6 +80,11 @@ defmodule DiagramForge.Diagrams.DiagramTest do
       assert diagram.diagram_source == "flowchart TD\n  A --> B"
       assert diagram.summary == "Shows GenServer message flow"
       assert diagram.notes_md == "- Call\n- Cast\n- Info"
+
+      # Verify user association through user_diagrams
+      loaded = Repo.preload(diagram, :users)
+      assert length(loaded.users) == 1
+      assert hd(loaded.users).id == user.id
     end
   end
 end

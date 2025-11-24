@@ -9,6 +9,18 @@ defmodule DiagramForge.Diagrams.Diagram do
 
   Diagrams are organized using tags. Users can create saved filters to
   quickly view diagrams matching specific tag combinations.
+
+  ## Ownership
+
+  Diagrams support multiple users through the `user_diagrams` join table:
+  - Users with `is_owner: true` can edit and delete
+  - Users with `is_owner: false` have bookmarked/saved the diagram
+
+  ## Visibility
+
+  - `:private` - Only owner can view (even via permalink)
+  - `:unlisted` - Anyone with link can view (default)
+  - `:public` - Anyone can view + discoverable in public feed
   """
 
   use Ecto.Schema
@@ -19,7 +31,10 @@ defmodule DiagramForge.Diagrams.Diagram do
 
   schema "diagrams" do
     belongs_to :document, DiagramForge.Diagrams.Document
-    belongs_to :user, DiagramForge.Accounts.User
+    belongs_to :forked_from, __MODULE__
+
+    many_to_many :users, DiagramForge.Accounts.User,
+      join_through: DiagramForge.Diagrams.UserDiagram
 
     field :slug, :string
     field :title, :string
@@ -27,10 +42,14 @@ defmodule DiagramForge.Diagrams.Diagram do
     field :tags, {:array, :string}, default: []
 
     field :format, Ecto.Enum, values: [:mermaid, :plantuml], default: :mermaid
+
+    field :visibility, Ecto.Enum,
+      values: [:private, :unlisted, :public],
+      default: :unlisted
+
     field :diagram_source, :string
     field :summary, :string
     field :notes_md, :string
-    field :created_by_superadmin, :boolean, default: false
 
     timestamps()
   end
@@ -39,17 +58,20 @@ defmodule DiagramForge.Diagrams.Diagram do
     diagram
     |> cast(attrs, [
       :document_id,
-      :user_id,
+      :forked_from_id,
       :slug,
       :title,
       :tags,
       :format,
+      :visibility,
       :diagram_source,
       :summary,
-      :notes_md,
-      :created_by_superadmin
+      :notes_md
     ])
     |> validate_required([:title, :format, :diagram_source, :slug])
+    |> validate_inclusion(:visibility, [:private, :unlisted, :public])
     |> unique_constraint(:slug)
+    |> foreign_key_constraint(:document_id)
+    |> foreign_key_constraint(:forked_from_id)
   end
 end

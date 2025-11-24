@@ -200,10 +200,12 @@ defmodule DiagramForgeWeb.AuthControllerTest do
       assert diagram.notes_md == "# Notes\n\nTest notes"
       assert diagram.tags == ["test", "oauth"]
 
-      # Verify user was created and diagram is associated
+      # Verify user was created and diagram is associated through user_diagrams
       user = DiagramForge.Accounts.get_user_by_email("newuser@example.com")
       assert user != nil
-      assert diagram.user_id == user.id
+
+      # Check user owns the diagram
+      assert DiagramForge.Diagrams.user_owns_diagram?(diagram.id, user.id)
 
       # Verify redirect to diagram permalink
       assert redirected_to(conn) == ~p"/d/#{diagram.id}"

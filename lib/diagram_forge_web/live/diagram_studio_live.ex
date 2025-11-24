@@ -34,7 +34,9 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
      |> assign(:available_tags, [])
      |> assign(:tag_counts, %{})
      |> assign(:pinned_filters, [])
-     |> assign(:diagrams, [])
+     |> assign(:owned_diagrams, [])
+     |> assign(:bookmarked_diagrams, [])
+     |> assign(:public_diagrams, [])
      |> assign(:selected_diagram, nil)
      |> assign(:generated_diagram, nil)
      |> assign(:prompt, "")
@@ -271,6 +273,23 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
   # Other event handlers
 
   @impl true
+  def handle_event("toggle_public_diagrams", _params, socket) do
+    current_user = socket.assigns.current_user
+    new_value = !current_user.show_public_diagrams
+
+    case Diagrams.update_user_public_diagrams_preference(current_user, new_value) do
+      {:ok, updated_user} ->
+        {:noreply,
+         socket
+         |> assign(:current_user, updated_user)
+         |> load_diagrams()}
+
+      {:error, _changeset} ->
+        {:noreply, put_flash(socket, :error, "Failed to update preference")}
+    end
+  end
+
+  @impl true
   def handle_event("toggle_diagram_theme", _params, socket) do
     new_theme = if socket.assigns.diagram_theme == "light", do: "dark", else: "light"
     {:noreply, assign(socket, :diagram_theme, new_theme)}
@@ -346,12 +365,17 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
         diagram = socket.assigns.generated_diagram
         current_user = socket.assigns.current_user
 
-        # Add user_id to the diagram before saving
-        diagram_with_user = Map.put(diagram, :user_id, current_user.id)
+        # Extract diagram attributes
+        attrs = %{
+          title: diagram.title,
+          slug: diagram.slug,
+          diagram_source: diagram.diagram_source,
+          summary: diagram.summary,
+          notes_md: diagram.notes_md,
+          tags: diagram.tags || []
+        }
 
-        # For now, just insert the diagram directly
-        # In the future, this will use create_diagram_for_user when user_diagrams join table exists
-        case Diagrams.save_generated_diagram(diagram_with_user) do
+        case Diagrams.create_diagram_for_user(attrs, current_user.id) do
           {:ok, saved_diagram} ->
             {:noreply,
              socket
@@ -466,9 +490,27 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
     user_id = socket.assigns.current_user && socket.assigns.current_user.id
     tag_filter = socket.assigns[:active_tag_filter] || []
 
-    diagrams = if user_id, do: Diagrams.list_diagrams_by_tags(user_id, tag_filter, :all), else: []
+    if user_id do
+      owned = Diagrams.list_diagrams_by_tags(user_id, tag_filter, :owned)
+      bookmarked = Diagrams.list_diagrams_by_tags(user_id, tag_filter, :bookmarked)
 
-    assign(socket, :diagrams, diagrams)
+      public =
+        if socket.assigns.current_user.show_public_diagrams do
+          Diagrams.list_public_diagrams()
+        else
+          []
+        end
+
+      socket
+      |> assign(:owned_diagrams, owned)
+      |> assign(:bookmarked_diagrams, bookmarked)
+      |> assign(:public_diagrams, public)
+    else
+      socket
+      |> assign(:owned_diagrams, [])
+      |> assign(:bookmarked_diagrams, [])
+      |> assign(:public_diagrams, [])
+    end
   end
 
   defp load_tags(socket) do
@@ -681,12 +723,8 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
               </div>
             </div>
 
-            <%!-- My Diagrams Section --%>
+            <%!-- Diagrams Section --%>
             <div class="bg-slate-900 rounded-xl p-4 flex flex-col overflow-hidden">
-              <h2 class="text-xl font-semibold mb-3">
-                MY DIAGRAMS ({length(@diagrams)})
-              </h2>
-
               <%!-- Tag Filter Input --%>
               <div class="mb-3">
                 <form phx-submit="add_tag_to_filter" class="w-full">
@@ -793,37 +831,134 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
                 </div>
               <% end %>
 
-              <%!-- Diagrams List --%>
-              <div class="overflow-y-auto space-y-2 max-h-[600px]">
-                <%= for diagram <- @diagrams do %>
-                  <div
-                    class={[
-                      "p-3 rounded-lg border transition cursor-pointer",
-                      @selected_diagram && @selected_diagram.id == diagram.id &&
-                        "bg-blue-900/30 border-blue-500",
-                      (!@selected_diagram || @selected_diagram.id != diagram.id) &&
-                        "border-slate-700 hover:bg-slate-800/50"
-                    ]}
-                    phx-click="select_diagram"
-                    phx-value-id={diagram.id}
-                  >
-                    <h3 class="font-medium text-sm mb-1">{diagram.title}</h3>
-                    <div class="flex flex-wrap gap-1">
-                      <%= for tag <- diagram.tags do %>
-                        <span class="text-xs px-2 py-0.5 bg-slate-700 rounded">
-                          {tag}
-                        </span>
+              <%!-- MY DIAGRAMS Section --%>
+              <div class="mb-4">
+                <h2 class="text-lg font-semibold mb-2 text-slate-300">
+                  MY DIAGRAMS ({length(@owned_diagrams)})
+                </h2>
+                <div class="space-y-2 max-h-64 overflow-y-auto">
+                  <%= for diagram <- @owned_diagrams do %>
+                    <div
+                      class={[
+                        "p-3 rounded-lg border transition cursor-pointer",
+                        @selected_diagram && @selected_diagram.id == diagram.id &&
+                          "bg-blue-900/30 border-blue-500",
+                        (!@selected_diagram || @selected_diagram.id != diagram.id) &&
+                          "border-slate-700 hover:bg-slate-800/50"
+                      ]}
+                      phx-click="select_diagram"
+                      phx-value-id={diagram.id}
+                    >
+                      <h3 class="font-medium text-sm mb-1">{diagram.title}</h3>
+                      <div class="flex flex-wrap gap-1">
+                        <%= for tag <- diagram.tags do %>
+                          <span class="text-xs px-2 py-0.5 bg-slate-700 rounded">
+                            {tag}
+                          </span>
+                        <% end %>
+                      </div>
+                    </div>
+                  <% end %>
+
+                  <%= if @owned_diagrams == [] do %>
+                    <p class="text-sm text-slate-400 text-center py-4">
+                      No diagrams yet. Upload a document or generate from prompt.
+                    </p>
+                  <% end %>
+                </div>
+              </div>
+
+              <%!-- FORKED DIAGRAMS Section --%>
+              <%= if @bookmarked_diagrams != [] do %>
+                <div class="mb-4 border-t border-slate-800 pt-4">
+                  <h2 class="text-lg font-semibold mb-2 text-slate-300">
+                    FORKED DIAGRAMS ({length(@bookmarked_diagrams)})
+                  </h2>
+                  <div class="space-y-2 max-h-64 overflow-y-auto">
+                    <%= for diagram <- @bookmarked_diagrams do %>
+                      <div
+                        class={[
+                          "p-3 rounded-lg border transition cursor-pointer",
+                          @selected_diagram && @selected_diagram.id == diagram.id &&
+                            "bg-blue-900/30 border-blue-500",
+                          (!@selected_diagram || @selected_diagram.id != diagram.id) &&
+                            "border-slate-700 hover:bg-slate-800/50"
+                        ]}
+                        phx-click="select_diagram"
+                        phx-value-id={diagram.id}
+                      >
+                        <h3 class="font-medium text-sm mb-1">{diagram.title}</h3>
+                        <div class="flex flex-wrap gap-1">
+                          <%= for tag <- diagram.tags do %>
+                            <span class="text-xs px-2 py-0.5 bg-slate-700 rounded">
+                              {tag}
+                            </span>
+                          <% end %>
+                        </div>
+                      </div>
+                    <% end %>
+                  </div>
+                </div>
+              <% end %>
+
+              <%!-- PUBLIC DIAGRAMS Section --%>
+              <%= if @current_user do %>
+                <div class="border-t border-slate-800 pt-4">
+                  <div class="flex items-center justify-between mb-2">
+                    <h2 class="text-lg font-semibold text-slate-300">
+                      PUBLIC DIAGRAMS
+                    </h2>
+                    <button
+                      phx-click="toggle_public_diagrams"
+                      class={[
+                        "px-2 py-1 text-xs rounded transition",
+                        @current_user.show_public_diagrams &&
+                          "bg-green-600 hover:bg-green-700",
+                        !@current_user.show_public_diagrams && "bg-slate-700 hover:bg-slate-600"
+                      ]}
+                    >
+                      <%= if @current_user.show_public_diagrams do %>
+                        Hide
+                      <% else %>
+                        Show
+                      <% end %>
+                    </button>
+                  </div>
+
+                  <%= if @current_user.show_public_diagrams do %>
+                    <div class="space-y-2 max-h-64 overflow-y-auto">
+                      <%= for diagram <- @public_diagrams do %>
+                        <div
+                          class={[
+                            "p-3 rounded-lg border transition cursor-pointer",
+                            @selected_diagram && @selected_diagram.id == diagram.id &&
+                              "bg-blue-900/30 border-blue-500",
+                            (!@selected_diagram || @selected_diagram.id != diagram.id) &&
+                              "border-slate-700 hover:bg-slate-800/50"
+                          ]}
+                          phx-click="select_diagram"
+                          phx-value-id={diagram.id}
+                        >
+                          <h3 class="font-medium text-sm mb-1">{diagram.title}</h3>
+                          <div class="flex flex-wrap gap-1">
+                            <%= for tag <- diagram.tags do %>
+                              <span class="text-xs px-2 py-0.5 bg-slate-700 rounded">
+                                {tag}
+                              </span>
+                            <% end %>
+                          </div>
+                        </div>
+                      <% end %>
+
+                      <%= if @public_diagrams == [] do %>
+                        <p class="text-sm text-slate-400 text-center py-4">
+                          No public diagrams available
+                        </p>
                       <% end %>
                     </div>
-                  </div>
-                <% end %>
-
-                <%= if @diagrams == [] do %>
-                  <p class="text-sm text-slate-400 text-center py-4">
-                    No diagrams yet. Upload a document or generate from prompt.
-                  </p>
-                <% end %>
-              </div>
+                  <% end %>
+                </div>
+              <% end %>
             </div>
           </div>
 

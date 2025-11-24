@@ -17,8 +17,11 @@ defmodule DiagramForge.Accounts.User do
     field :provider_token, DiagramForge.Vault.EncryptedBinary
     field :avatar_url, :string
     field :last_sign_in_at, :utc_datetime
+    field :show_public_diagrams, :boolean, default: false
 
-    has_many :diagrams, DiagramForge.Diagrams.Diagram
+    many_to_many :diagrams, DiagramForge.Diagrams.Diagram,
+      join_through: DiagramForge.Diagrams.UserDiagram
+
     has_many :saved_filters, DiagramForge.Diagrams.SavedFilter, foreign_key: :user_id
 
     timestamps()
@@ -26,7 +29,15 @@ defmodule DiagramForge.Accounts.User do
 
   def changeset(user, attrs) do
     user
-    |> cast(attrs, [:email, :name, :provider, :provider_uid, :provider_token, :avatar_url])
+    |> cast(attrs, [
+      :email,
+      :name,
+      :provider,
+      :provider_uid,
+      :provider_token,
+      :avatar_url,
+      :show_public_diagrams
+    ])
     |> validate_required([:email, :provider, :provider_uid])
     |> validate_format(:email, ~r/^[^\s]+@[^\s]+$/)
     |> unique_constraint(:email)
@@ -37,5 +48,11 @@ defmodule DiagramForge.Accounts.User do
     user
     |> cast(attrs, [:last_sign_in_at])
     |> put_change(:last_sign_in_at, DateTime.utc_now() |> DateTime.truncate(:second))
+  end
+
+  def preferences_changeset(user, attrs) do
+    user
+    |> cast(attrs, [:show_public_diagrams])
+    |> validate_required([:show_public_diagrams])
   end
 end

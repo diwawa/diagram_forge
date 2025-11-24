@@ -97,11 +97,13 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
       |> render_click()
 
       # Now diagram should be in database
-      diagrams = Diagrams.list_diagrams()
+      diagrams = Diagrams.list_owned_diagrams(user.id)
       assert length(diagrams) == 1
       diagram = hd(diagrams)
       assert diagram.title == "GenServer Flow"
-      assert diagram.user_id == user.id
+
+      # Verify user owns the diagram
+      assert Diagrams.user_owns_diagram?(diagram.id, user.id)
     end
 
     test "redirects to OAuth when unauthenticated user tries to save generated diagram",

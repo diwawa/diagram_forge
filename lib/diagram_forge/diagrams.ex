@@ -6,7 +6,8 @@ defmodule DiagramForge.Diagrams do
   import Ecto.Query, warn: false
   alias DiagramForge.Repo
 
-  alias DiagramForge.Diagrams.{Diagram, Document}
+  alias DiagramForge.Accounts.User
+  alias DiagramForge.Diagrams.{Diagram, Document, UserDiagram}
   alias DiagramForge.Diagrams.Workers.ProcessDocumentJob
 
   # Documents
@@ -113,6 +114,77 @@ defmodule DiagramForge.Diagrams do
     end
   end
 
+  # Authorization Functions
+
+  @doc """
+  Checks if a user owns a diagram.
+  """
+  def user_owns_diagram?(diagram_id, user_id) do
+    Repo.exists?(
+      from ud in UserDiagram,
+        where:
+          ud.diagram_id == ^diagram_id and
+            ud.user_id == ^user_id and
+            ud.is_owner == true
+    )
+  end
+
+  @doc """
+  Checks if a user has bookmarked a diagram.
+  """
+  def user_bookmarked_diagram?(diagram_id, user_id) do
+    Repo.exists?(
+      from ud in UserDiagram,
+        where:
+          ud.diagram_id == ^diagram_id and
+            ud.user_id == ^user_id and
+            ud.is_owner == false
+    )
+  end
+
+  @doc """
+  Gets the owner of a diagram (first user with is_owner: true).
+  Returns nil if no owner exists.
+  """
+  def get_diagram_owner(diagram_id) do
+    Repo.one(
+      from u in User,
+        join: ud in UserDiagram,
+        on: ud.user_id == u.id,
+        where: ud.diagram_id == ^diagram_id and ud.is_owner == true,
+        limit: 1
+    )
+  end
+
+  @doc """
+  Checks if a user can view a diagram based on visibility rules.
+
+  - Private: Only owner can view
+  - Unlisted: Anyone can view
+  - Public: Anyone can view
+  """
+  def can_view_diagram?(%Diagram{} = diagram, user) do
+    case diagram.visibility do
+      :private -> user && user_owns_diagram?(diagram.id, user.id)
+      :unlisted -> true
+      :public -> true
+    end
+  end
+
+  @doc """
+  Checks if a user can edit a diagram (must be owner).
+  """
+  def can_edit_diagram?(%Diagram{} = diagram, user) do
+    user && user_owns_diagram?(diagram.id, user.id)
+  end
+
+  @doc """
+  Checks if a user can delete a diagram (must be owner).
+  """
+  def can_delete_diagram?(%Diagram{} = diagram, user) do
+    user && user_owns_diagram?(diagram.id, user.id)
+  end
+
   # Diagrams
 
   @doc """
@@ -129,6 +201,43 @@ defmodule DiagramForge.Diagrams do
     Repo.all(
       from d in Diagram,
         where: d.document_id == ^document_id,
+        order_by: [desc: d.inserted_at]
+    )
+  end
+
+  @doc """
+  Lists diagrams owned by a user (is_owner: true).
+  """
+  def list_owned_diagrams(user_id) do
+    Repo.all(
+      from d in Diagram,
+        join: ud in UserDiagram,
+        on: ud.diagram_id == d.id,
+        where: ud.user_id == ^user_id and ud.is_owner == true,
+        order_by: [desc: d.inserted_at]
+    )
+  end
+
+  @doc """
+  Lists diagrams bookmarked by a user (is_owner: false).
+  """
+  def list_bookmarked_diagrams(user_id) do
+    Repo.all(
+      from d in Diagram,
+        join: ud in UserDiagram,
+        on: ud.diagram_id == d.id,
+        where: ud.user_id == ^user_id and ud.is_owner == false,
+        order_by: [desc: d.inserted_at]
+    )
+  end
+
+  @doc """
+  Lists all public diagrams for discovery feed.
+  """
+  def list_public_diagrams do
+    Repo.all(
+      from d in Diagram,
+        where: d.visibility == :public,
         order_by: [desc: d.inserted_at]
     )
   end
@@ -170,6 +279,65 @@ defmodule DiagramForge.Diagrams do
   end
 
   @doc """
+  Creates a diagram with user ownership.
+
+  Creates both the diagram and the user_diagrams entry with is_owner: true.
+  """
+  def create_diagram_for_user(attrs, user_id) do
+    Repo.transaction(fn ->
+      diagram_changeset = Diagram.changeset(%Diagram{}, attrs)
+
+      case Repo.insert(diagram_changeset) do
+        {:ok, diagram} ->
+          create_user_diagram_entry(diagram, user_id)
+
+        {:error, changeset} ->
+          Repo.rollback(changeset)
+      end
+    end)
+  end
+
+  defp create_user_diagram_entry(diagram, user_id) do
+    user_diagram_changeset =
+      UserDiagram.changeset(%UserDiagram{}, %{
+        user_id: user_id,
+        diagram_id: diagram.id,
+        is_owner: true
+      })
+
+    case Repo.insert(user_diagram_changeset) do
+      {:ok, _user_diagram} -> diagram
+      {:error, changeset} -> Repo.rollback(changeset)
+    end
+  end
+
+  @doc """
+  Updates a diagram (only owner can update).
+  """
+  def update_diagram(%Diagram{} = diagram, attrs, user_id) do
+    if can_edit_diagram?(diagram, %{id: user_id}) do
+      diagram
+      |> Diagram.changeset(attrs)
+      |> Repo.update()
+    else
+      {:error, :unauthorized}
+    end
+  end
+
+  @doc """
+  Deletes a diagram (only owner can delete).
+
+  Cascades to user_diagrams automatically.
+  """
+  def delete_diagram(%Diagram{} = diagram, user_id) do
+    if can_delete_diagram?(diagram, %{id: user_id}) do
+      Repo.delete(diagram)
+    else
+      {:error, :unauthorized}
+    end
+  end
+
+  @doc """
   Generates a diagram from a free-form text prompt.
 
   ## Examples
@@ -195,11 +363,12 @@ defmodule DiagramForge.Diagrams do
 
   Used for tag autocomplete and tag cloud.
   """
-  def list_available_tags(_user_id) do
-    # For now, just get all tags from all diagrams
-    # In the future when we have user_diagrams join table, we'll filter by user
+  def list_available_tags(user_id) do
     query =
       from d in Diagram,
+        join: ud in UserDiagram,
+        on: ud.diagram_id == d.id,
+        where: ud.user_id == ^user_id,
         select: d.tags
 
     Repo.all(query)
@@ -209,15 +378,16 @@ defmodule DiagramForge.Diagrams do
   end
 
   @doc """
-  Gets tag counts for all diagrams.
+  Gets tag counts for all diagrams a user can access.
 
   Returns a map of tag => count for displaying tag clouds.
   """
-  def get_tag_counts(_user_id) do
-    # For now, just get all tags from all diagrams
-    # In the future when we have user_diagrams join table, we'll filter by user
+  def get_tag_counts(user_id) do
     query =
       from d in Diagram,
+        join: ud in UserDiagram,
+        on: ud.diagram_id == d.id,
+        where: ud.user_id == ^user_id,
         select: d.tags
 
     Repo.all(query)
@@ -359,18 +529,37 @@ defmodule DiagramForge.Diagrams do
   Empty tag list means "show all diagrams".
   Tags are combined with AND logic (diagram must have ALL tags).
   """
-  def list_diagrams_by_tags(_user_id, tags, _ownership \\ :all)
+  def list_diagrams_by_tags(user_id, tags, ownership \\ :all)
 
-  def list_diagrams_by_tags(_user_id, [], _ownership) do
+  def list_diagrams_by_tags(user_id, [], ownership) do
     # Empty tags means show all
-    list_diagrams()
+    case ownership do
+      :owned -> list_owned_diagrams(user_id)
+      :bookmarked -> list_bookmarked_diagrams(user_id)
+      :all -> list_owned_diagrams(user_id) ++ list_bookmarked_diagrams(user_id)
+    end
   end
 
-  def list_diagrams_by_tags(_user_id, tags, _ownership) when is_list(tags) do
-    # Build query with tag filter (must have ALL tags)
+  def list_diagrams_by_tags(user_id, tags, ownership) when is_list(tags) do
+    # Build base query with ownership filter
+    base_query =
+      from d in Diagram,
+        join: ud in UserDiagram,
+        on: ud.diagram_id == d.id,
+        where: ud.user_id == ^user_id
+
+    # Add ownership filter
     query =
-      Enum.reduce(tags, from(d in Diagram), fn tag, acc ->
-        from d in acc,
+      case ownership do
+        :owned -> from [d, ud] in base_query, where: ud.is_owner == true
+        :bookmarked -> from [d, ud] in base_query, where: ud.is_owner == false
+        :all -> base_query
+      end
+
+    # Add tag filter (must have ALL tags)
+    query =
+      Enum.reduce(tags, query, fn tag, acc ->
+        from [d, ud] in acc,
           where: ^tag in d.tags
       end)
 
@@ -405,8 +594,9 @@ defmodule DiagramForge.Diagrams do
   - Tags copied from original (user can edit after)
   - New ID generated
   - forked_from_id set to original
+  - New user_diagrams entry with is_owner: true
   """
-  def fork_diagram(original_id, _user_id) do
+  def fork_diagram(original_id, user_id) do
     Repo.transaction(fn ->
       original = Repo.get!(Diagram, original_id)
 
@@ -423,9 +613,7 @@ defmodule DiagramForge.Diagrams do
         forked_from_id: original.id
       }
 
-      case %Diagram{}
-           |> Diagram.changeset(new_diagram_attrs)
-           |> Repo.insert() do
+      case create_diagram_for_user(new_diagram_attrs, user_id) do
         {:ok, diagram} -> diagram
         {:error, reason} -> Repo.rollback(reason)
       end
@@ -435,14 +623,64 @@ defmodule DiagramForge.Diagrams do
   @doc """
   Bookmarks/saves a diagram for a user.
 
-  For now this is a placeholder - we'll implement user_diagrams join table later.
+  Creates user_diagrams entry with is_owner: false.
+  User can add their own tags to bookmarked diagrams.
   """
-  def bookmark_diagram(_diagram_id, _user_id) do
-    {:error, :not_implemented}
+  def bookmark_diagram(diagram_id, user_id) do
+    user_diagram_changeset =
+      UserDiagram.changeset(%UserDiagram{}, %{
+        user_id: user_id,
+        diagram_id: diagram_id,
+        is_owner: false
+      })
+
+    Repo.insert(user_diagram_changeset)
+  end
+
+  @doc """
+  Removes a diagram bookmark (removes user_diagrams entry with is_owner: false).
+  """
+  def remove_diagram_bookmark(diagram_id, user_id) do
+    Repo.delete_all(
+      from ud in UserDiagram,
+        where:
+          ud.diagram_id == ^diagram_id and
+            ud.user_id == ^user_id and
+            ud.is_owner == false
+    )
+
+    :ok
+  end
+
+  @doc """
+  Assigns a diagram to a user with ownership.
+  Primarily used for test fixtures where diagrams are created without users.
+  """
+  def assign_diagram_to_user(diagram_id, user_id, is_owner \\ true) do
+    user_diagram_changeset =
+      UserDiagram.changeset(%UserDiagram{}, %{
+        user_id: user_id,
+        diagram_id: diagram_id,
+        is_owner: is_owner
+      })
+
+    Repo.insert(user_diagram_changeset)
   end
 
   defp generate_unique_slug(original_slug) do
-    timestamp = :os.system_time(:millisecond)
-    "#{original_slug}-fork-#{timestamp}"
+    # Add random suffix to ensure uniqueness
+    suffix = :crypto.strong_rand_bytes(4) |> Base.encode16(case: :lower)
+    "#{original_slug}-#{suffix}"
+  end
+
+  # User Preferences
+
+  @doc """
+  Updates user's show_public_diagrams preference.
+  """
+  def update_user_public_diagrams_preference(user, show_public) do
+    user
+    |> User.preferences_changeset(%{show_public_diagrams: show_public})
+    |> Repo.update()
   end
 end

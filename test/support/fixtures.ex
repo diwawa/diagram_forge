@@ -36,7 +36,6 @@ defmodule DiagramForge.Fixtures do
   end
 
   def build(:diagram, attrs) do
-    user = attrs[:user]
     document = attrs[:document]
 
     base_attrs = %{
@@ -49,10 +48,10 @@ defmodule DiagramForge.Fixtures do
     }
 
     base_attrs =
-      cond do
-        user -> Map.put(base_attrs, :user_id, user.id)
-        document -> Map.put(base_attrs, :document_id, document.id)
-        true -> base_attrs
+      if document do
+        Map.put(base_attrs, :document_id, document.id)
+      else
+        base_attrs
       end
 
     %Diagram{}
