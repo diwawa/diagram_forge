@@ -95,6 +95,7 @@ defmodule DiagramForge.MixProject do
       "ecto.setup": ["ecto.create", "ecto.migrate", "run priv/repo/seeds.exs"],
       "ecto.reset": ["ecto.drop", "ecto.setup"],
       "seed.diagrams": ["run priv/repo/seed_diagrams.exs"],
+      "seed.usage": ["run priv/repo/seed_usage.exs"],
       test: ["ecto.create --quiet", "ecto.migrate --quiet", "test"],
       "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
       "assets.build": ["compile", "tailwind diagram_forge", "esbuild diagram_forge"],
