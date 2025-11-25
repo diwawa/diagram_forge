@@ -1024,6 +1024,33 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
                 </button>
               <% end %>
 
+              <%!-- Tag Cloud - clickable tags for filtering --%>
+              <%= if @tag_counts != %{} do %>
+                <div class="mb-3 pb-3 border-b border-slate-800">
+                  <h3 class="text-sm font-semibold mb-2 text-slate-400">AVAILABLE TAGS</h3>
+                  <div class="flex flex-wrap gap-1.5">
+                    <%= for {tag, count} <- Enum.sort_by(@tag_counts, fn {_tag, count} -> -count end) do %>
+                      <button
+                        type="button"
+                        phx-click="add_tag_to_filter"
+                        phx-value-tag={tag}
+                        class={[
+                          "inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs transition",
+                          tag in @active_tag_filter &&
+                            "bg-blue-600 text-white cursor-default",
+                          tag not in @active_tag_filter &&
+                            "bg-slate-700 hover:bg-slate-600 text-slate-300"
+                        ]}
+                        disabled={tag in @active_tag_filter}
+                      >
+                        <span>{tag}</span>
+                        <span class="text-slate-400">({count})</span>
+                      </button>
+                    <% end %>
+                  </div>
+                </div>
+              <% end %>
+
               <%!-- Pinned Filters Section --%>
               <%= if @pinned_filters != [] do %>
                 <div class="mb-3 pb-3 border-b border-slate-800">
