@@ -1,6 +1,8 @@
 defmodule DiagramForge.Diagrams.DocumentIngestor do
   @moduledoc """
   Handles text extraction from documents and chunking for LLM processing.
+
+  Supports PDF, Markdown, and plain text files.
   """
 
   alias DiagramForge.Diagrams.Document
@@ -9,7 +11,7 @@ defmodule DiagramForge.Diagrams.DocumentIngestor do
   Extracts text from a document based on its source type.
 
   For PDFs, uses the `pdftotext` command-line tool.
-  For Markdown, reads the file directly.
+  For Markdown and plain text, reads the file directly.
 
   Returns `{:ok, text}` on success or `{:error, reason}` on failure.
   """
@@ -17,6 +19,13 @@ defmodule DiagramForge.Diagrams.DocumentIngestor do
     case File.read(path) do
       {:ok, text} -> {:ok, text}
       {:error, reason} -> {:error, "Failed to read markdown file: #{inspect(reason)}"}
+    end
+  end
+
+  def extract_text(%Document{source_type: :text, path: path}) do
+    case File.read(path) do
+      {:ok, text} -> {:ok, text}
+      {:error, reason} -> {:error, "Failed to read text file: #{inspect(reason)}"}
     end
   end
 

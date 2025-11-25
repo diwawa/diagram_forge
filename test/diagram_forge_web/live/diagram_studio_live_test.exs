@@ -209,7 +209,7 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
       # Verify upload area exists with instructional text
       assert has_element?(view, "#upload-form")
       assert render(view) =~ "Upload a document"
-      assert render(view) =~ "PDF or Markdown"
+      assert render(view) =~ "PDF, Markdown, or Text"
 
       # Verify upload button is not shown when no file is selected
       # (button only appears after selecting a file)

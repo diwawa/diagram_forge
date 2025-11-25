@@ -67,9 +67,9 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
       |> load_tags()
       |> load_filters()
       |> allow_upload(:document,
-        accept: ~w(.pdf .md .markdown),
+        accept: ~w(.pdf .md .markdown .txt),
         max_entries: 1,
-        max_file_size: 50_000_000
+        max_file_size: 2_000_000
       )
 
     {:ok, socket}
@@ -706,6 +706,7 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
         source_type =
           case Path.extname(entry.client_name) do
             ".pdf" -> :pdf
+            ".txt" -> :text
             _ -> :markdown
           end
 
@@ -1059,7 +1060,7 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
                       <span class="text-xs font-medium">Upload a document</span>
                     </div>
                     <p class="text-xs text-slate-500">
-                      Drop a PDF or Markdown file to generate diagrams from its content
+                      PDF, Markdown, or Text (max 2MB)
                     </p>
                   </div>
                 </label>

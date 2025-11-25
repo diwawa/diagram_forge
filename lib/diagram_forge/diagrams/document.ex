@@ -15,7 +15,7 @@ defmodule DiagramForge.Diagrams.Document do
     belongs_to :user, DiagramForge.Accounts.User
 
     field :title, :string
-    field :source_type, Ecto.Enum, values: [:pdf, :markdown]
+    field :source_type, Ecto.Enum, values: [:pdf, :markdown, :text]
     field :path, :string
     field :raw_text, :string
 

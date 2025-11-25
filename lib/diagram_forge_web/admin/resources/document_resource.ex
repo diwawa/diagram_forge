@@ -64,7 +64,8 @@ defmodule DiagramForgeWeb.Admin.DocumentResource do
         label: "Source Type",
         options: [
           {"PDF", :pdf},
-          {"Markdown", :markdown}
+          {"Markdown", :markdown},
+          {"Text", :text}
         ]
       },
       status: %{
