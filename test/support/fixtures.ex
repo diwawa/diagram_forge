@@ -5,6 +5,7 @@ defmodule DiagramForge.Fixtures do
   """
 
   alias DiagramForge.Accounts.User
+  alias DiagramForge.AI.Prompt
   alias DiagramForge.Diagrams.{Diagram, Document, SavedFilter}
   alias DiagramForge.Repo
 
@@ -97,6 +98,20 @@ defmodule DiagramForge.Fixtures do
         provider: "github",
         provider_uid: "github_uid_#{unique_id}",
         provider_token: "test_token_#{unique_id}"
+      })
+    )
+  end
+
+  def build(:prompt, attrs) do
+    unique_id = System.unique_integer([:positive])
+
+    %Prompt{}
+    |> Prompt.changeset(
+      attrs
+      |> Enum.into(%{
+        key: "test_prompt_#{unique_id}",
+        content: "Test prompt content #{unique_id}",
+        description: "Test prompt description"
       })
     )
   end
