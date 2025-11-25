@@ -267,8 +267,9 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
 
         {:noreply, socket}
 
-      {:error, _changeset} ->
-        {:noreply, put_flash(socket, :error, "Failed to save filter")}
+      {:error, changeset} ->
+        error_message = format_changeset_error(changeset, "Failed to save filter")
+        {:noreply, put_flash(socket, :error, error_message)}
     end
   end
 
@@ -293,10 +294,11 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
 
   @impl true
   def handle_event("toggle_filter_pin", %{"id" => id}, socket) do
+    # Unpinning a filter deletes it - we only show pinned filters
     filter = Diagrams.get_saved_filter!(id)
     user_id = socket.assigns.current_user.id
 
-    case Diagrams.update_saved_filter(filter, %{is_pinned: !filter.is_pinned}, user_id) do
+    case Diagrams.delete_saved_filter(filter, user_id) do
       {:ok, _} ->
         socket =
           socket
@@ -1075,6 +1077,30 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
 
   defp build_ai_opts(user_id) do
     [user_id: user_id]
+  end
+
+  # Formats changeset errors into a user-friendly message.
+  # Handles common constraint violations with specific messages.
+  defp format_changeset_error(changeset, default_message) do
+    cond do
+      # Composite unique constraint on [:user_id, :name] reports error on user_id
+      has_constraint_error?(changeset, "saved_filters_user_id_name_index") ->
+        "A filter with that name already exists"
+
+      changeset.errors != [] ->
+        {field, {msg, _}} = hd(changeset.errors)
+        "#{Phoenix.Naming.humanize(field)} #{msg}"
+
+      true ->
+        default_message
+    end
+  end
+
+  defp has_constraint_error?(changeset, constraint_name) do
+    Enum.any?(changeset.errors, fn
+      {_field, {_msg, opts}} -> opts[:constraint_name] == constraint_name
+      _ -> false
+    end)
   end
 
   @impl true

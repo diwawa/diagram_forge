@@ -603,7 +603,12 @@ defmodule DiagramForge.Diagrams do
   end
 
   @doc """
-  Gets a saved filter by ID.
+  Gets a saved filter by ID. Returns nil if not found.
+  """
+  def get_saved_filter(id), do: Repo.get(SavedFilter, id)
+
+  @doc """
+  Gets a saved filter by ID. Raises if not found.
   """
   def get_saved_filter!(id), do: Repo.get!(SavedFilter, id)
 

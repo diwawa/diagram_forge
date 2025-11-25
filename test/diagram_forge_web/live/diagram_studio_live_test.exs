@@ -551,44 +551,32 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
       assert filters == []
     end
 
-    test "pins and unpins filter", %{conn: conn} do
+    test "unpinning a filter deletes it", %{conn: conn} do
       user = fixture(:user)
 
-      # Create an unpinned filter
-      {:ok, _filter} =
-        Diagrams.create_saved_filter(
-          %{name: "Toggle Pin", tag_filter: ["test"], is_pinned: false},
-          user.id
-        )
-
-      conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
-      {:ok, view, _html} = live(conn, ~p"/")
-
-      # Filter should not be in pinned section initially
-      refute render(view) =~ "Toggle Pin"
-
-      # Pin the filter
-      # First we need to make it visible - since it's not pinned, it won't show in UI
-      # Let's create it as pinned first and test unpinning
+      # Create a pinned filter
       {:ok, pinned_filter} =
         Diagrams.create_saved_filter(
           %{name: "Pinned Filter", tag_filter: ["elixir"], is_pinned: true},
           user.id
         )
 
+      conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
       {:ok, view, html} = live(conn, ~p"/")
 
       # Filter should be visible in pinned section
       assert html =~ "Pinned Filter"
 
-      # Toggle pin (unpin it)
+      # Toggle pin (unpin it) - this should delete the filter
       view
       |> element("button[phx-click='toggle_filter_pin'][phx-value-id='#{pinned_filter.id}']")
       |> render_click()
 
-      # Verify filter was unpinned
-      updated_filter = Diagrams.get_saved_filter!(pinned_filter.id)
-      refute updated_filter.is_pinned
+      # Verify filter was deleted
+      assert Diagrams.get_saved_filter(pinned_filter.id) == nil
+
+      # Filter should no longer be visible
+      refute render(view) =~ "Pinned Filter"
     end
   end
 
