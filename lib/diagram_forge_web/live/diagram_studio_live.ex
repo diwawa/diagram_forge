@@ -1178,7 +1178,7 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
                     <button
                       type="button"
                       phx-click="clear_filter"
-                      class="px-2 py-1 text-xs bg-slate-700 hover:bg-slate-600 text-white rounded-full transition"
+                      class="px-2 py-1 text-xs bg-green-600 hover:bg-green-500 text-white rounded-full transition"
                     >
                       Clear
                     </button>
