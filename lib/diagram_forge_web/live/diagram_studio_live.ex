@@ -1570,16 +1570,17 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
                   <%= if @current_user do %>
                     <button
                       phx-click="toggle_public_diagrams"
-                      class={[
-                        "px-2 py-1 text-xs rounded transition",
-                        @show_public_diagrams && "bg-green-600 hover:bg-green-700",
-                        !@show_public_diagrams && "bg-slate-700 hover:bg-slate-600"
-                      ]}
+                      class="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-200 transition"
+                      title={
+                        if @show_public_diagrams,
+                          do: "Hide public diagrams",
+                          else: "Show public diagrams"
+                      }
                     >
                       <%= if @show_public_diagrams do %>
-                        Hide
+                        <.icon name="hero-eye" class="w-4 h-4 text-green-500" />
                       <% else %>
-                        Show
+                        <.icon name="hero-eye-slash" class="w-4 h-4 text-slate-500" />
                       <% end %>
                     </button>
                   <% end %>
