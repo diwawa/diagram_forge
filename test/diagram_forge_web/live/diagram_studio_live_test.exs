@@ -84,7 +84,8 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
       # Verify diagram was generated and is displayed
       assert html =~ "GenServer Flow"
       assert html =~ "Shows GenServer flow"
-      assert html =~ "Save Diagram"
+      # Check for unsaved diagram buttons
+      assert html =~ "save_generated_diagram"
       assert html =~ "Discard"
 
       # Diagram should NOT be in database yet (needs to be saved)
@@ -93,7 +94,7 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
 
       # Click Save button
       view
-      |> element("button", "Save Diagram")
+      |> element("button[phx-click='save_generated_diagram']")
       |> render_click()
 
       # Now diagram should be in database
@@ -140,7 +141,7 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
       # Click Save button without being authenticated
       result =
         view
-        |> element("button", "Save Diagram")
+        |> element("button[phx-click='save_generated_diagram']")
         |> render_click()
 
       # Should redirect to OAuth with pending diagram data
@@ -660,19 +661,19 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
 
   describe "fork diagram with tags" do
     test "forks diagram and copies tags", %{conn: conn} do
-      user = fixture(:user)
-      original = fixture(:diagram, tags: ["elixir", "original"])
-      Diagrams.assign_diagram_to_user(original.id, user.id, true)
+      owner = fixture(:user)
+      viewer = fixture(:user)
+      # Create a public diagram owned by another user
+      original = fixture(:diagram, tags: ["elixir", "original"], visibility: :public)
+      Diagrams.assign_diagram_to_user(original.id, owner.id, true)
 
-      conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
-      {:ok, view, _html} = live(conn, ~p"/")
+      # Log in as the viewer (not the owner)
+      conn = Plug.Test.init_test_session(conn, %{user_id: viewer.id})
 
-      # Select the diagram first
-      view
-      |> element("div[phx-click='select_diagram'][phx-value-id='#{original.id}']")
-      |> render_click()
+      # Navigate to the diagram via URL (public diagram)
+      {:ok, view, _html} = live(conn, ~p"/d/#{original.id}")
 
-      # Fork the diagram
+      # Fork the diagram (Fork button shown for non-owners)
       view
       |> element("button[phx-click='fork_diagram'][phx-value-id='#{original.id}']")
       |> render_click()
@@ -683,37 +684,38 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
       assert html =~ "Diagram forked successfully"
 
       # Verify fork was created with same tags
-      owned_diagrams = Diagrams.list_owned_diagrams(user.id)
-      assert length(owned_diagrams) == 2
+      owned_diagrams = Diagrams.list_owned_diagrams(viewer.id)
+      assert length(owned_diagrams) == 1
 
-      forked = Enum.find(owned_diagrams, fn d -> d.id != original.id end)
+      forked = List.first(owned_diagrams)
       assert forked.tags == original.tags
       assert forked.forked_from_id == original.id
     end
 
     test "fork preserves original diagram tags after modification", %{conn: conn} do
-      user = fixture(:user)
-      original = fixture(:diagram, tags: ["elixir", "phoenix"])
-      Diagrams.assign_diagram_to_user(original.id, user.id, true)
+      owner = fixture(:user)
+      viewer = fixture(:user)
+      # Create a public diagram owned by another user
+      original = fixture(:diagram, tags: ["elixir", "phoenix"], visibility: :public)
+      Diagrams.assign_diagram_to_user(original.id, owner.id, true)
 
-      conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
-      {:ok, view, _html} = live(conn, ~p"/")
+      # Log in as the viewer (not the owner)
+      conn = Plug.Test.init_test_session(conn, %{user_id: viewer.id})
 
-      # Select and fork
-      view
-      |> element("div[phx-click='select_diagram'][phx-value-id='#{original.id}']")
-      |> render_click()
+      # Navigate to the diagram via URL (public diagram)
+      {:ok, view, _html} = live(conn, ~p"/d/#{original.id}")
 
+      # Fork the diagram
       view
       |> element("button[phx-click='fork_diagram'][phx-value-id='#{original.id}']")
       |> render_click()
 
       # Get the forked diagram
-      owned_diagrams = Diagrams.list_owned_diagrams(user.id)
-      forked = Enum.find(owned_diagrams, fn d -> d.id != original.id end)
+      owned_diagrams = Diagrams.list_owned_diagrams(viewer.id)
+      forked = List.first(owned_diagrams)
 
       # Modify the forked diagram's tags
-      {:ok, _} = Diagrams.add_tags(forked, ["new-tag"], user.id)
+      {:ok, _} = Diagrams.add_tags(forked, ["new-tag"], viewer.id)
 
       # Original should still have original tags
       original_refreshed = Diagrams.get_diagram!(original.id)

@@ -34,10 +34,12 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
       socket
       |> assign(:current_user, current_user)
       |> assign(:documents, list_documents())
+      |> assign(:document_progress, %{})
       |> assign(:selected_document, nil)
       |> assign(:active_tag_filter, [])
       |> assign(:available_tags, [])
       |> assign(:tag_counts, %{})
+      |> assign(:tag_search, "")
       |> assign(:pinned_filters, [])
       |> assign(:owned_diagrams, [])
       |> assign(:bookmarked_diagrams, [])
@@ -51,6 +53,8 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
       |> assign(:prompt, "")
       |> assign(:uploaded_files, [])
       |> assign(:generating, false)
+      |> assign(:uploading, false)
+      |> assign(:fixing_syntax, false)
       |> assign(:diagram_theme, "dark")
       |> assign(:show_save_filter_modal, false)
       |> assign(:editing_filter, nil)
@@ -178,6 +182,16 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
   @impl true
   def handle_event("update_tag_input", %{"tag" => tag}, socket) do
     {:noreply, assign(socket, :new_tag_input, tag)}
+  end
+
+  @impl true
+  def handle_event("search_tags", %{"value" => search}, socket) do
+    {:noreply, assign(socket, :tag_search, search)}
+  end
+
+  @impl true
+  def handle_event("clear_tag_search", _params, socket) do
+    {:noreply, assign(socket, :tag_search, "")}
   end
 
   # Pagination events for owned diagrams
@@ -471,6 +485,28 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
   end
 
   @impl true
+  def handle_event("fix_syntax", %{"id" => id}, socket) do
+    if socket.assigns.fixing_syntax do
+      {:noreply, socket}
+    else
+      diagram = Diagrams.get_diagram!(id)
+      send(self(), {:do_fix_syntax, diagram})
+      {:noreply, assign(socket, :fixing_syntax, true)}
+    end
+  end
+
+  @impl true
+  def handle_event("fix_generated_syntax", _params, socket) do
+    if socket.assigns.fixing_syntax do
+      {:noreply, socket}
+    else
+      diagram = socket.assigns.generated_diagram
+      send(self(), {:do_fix_generated_syntax, diagram})
+      {:noreply, assign(socket, :fixing_syntax, true)}
+    end
+  end
+
+  @impl true
   def handle_event("change_visibility", %{"id" => id, "visibility" => visibility}, socket) do
     diagram = Diagrams.get_diagram!(id)
     user_id = socket.assigns.current_user.id
@@ -698,43 +734,57 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
 
   @impl true
   def handle_event("save", _params, socket) do
+    # Prevent double-clicks
+    if socket.assigns.uploading do
+      {:noreply, socket}
+    else
+      process_upload(socket)
+    end
+  end
+
+  defp process_upload(socket) do
+    socket = assign(socket, :uploading, true)
+
     uploaded_files =
       consume_uploaded_entries(socket, :document, fn %{path: path}, entry ->
-        dest = Path.join([System.tmp_dir(), "#{entry.uuid}#{Path.extname(entry.client_name)}"])
-        File.cp!(path, dest)
-
-        source_type =
-          case Path.extname(entry.client_name) do
-            ".pdf" -> :pdf
-            ".txt" -> :text
-            _ -> :markdown
-          end
-
-        attrs = %{
-          title: Path.basename(entry.client_name, Path.extname(entry.client_name)),
-          source_type: source_type,
-          path: dest
-        }
-
-        user_id = socket.assigns.current_user.id
-
-        case Diagrams.create_document(attrs, user_id) do
-          {:ok, document} ->
-            %{"document_id" => document.id}
-            |> ProcessDocumentJob.new()
-            |> Oban.insert()
-
-            {:ok, document}
-
-          {:error, _changeset} ->
-            {:postpone, :error}
-        end
+        process_uploaded_entry(path, entry, socket.assigns.current_user.id)
       end)
 
     {:noreply,
      socket
+     |> assign(:uploading, false)
      |> assign(:documents, list_documents())
      |> put_flash(:info, "Uploaded #{length(uploaded_files)} file(s)")}
+  end
+
+  defp process_uploaded_entry(path, entry, user_id) do
+    dest = Path.join([System.tmp_dir(), "#{entry.uuid}#{Path.extname(entry.client_name)}"])
+    File.cp!(path, dest)
+
+    source_type =
+      case Path.extname(entry.client_name) do
+        ".pdf" -> :pdf
+        ".txt" -> :text
+        _ -> :markdown
+      end
+
+    attrs = %{
+      title: Path.basename(entry.client_name, Path.extname(entry.client_name)),
+      source_type: source_type,
+      path: dest
+    }
+
+    case Diagrams.create_document(attrs, user_id) do
+      {:ok, document} ->
+        %{"document_id" => document.id}
+        |> ProcessDocumentJob.new()
+        |> Oban.insert()
+
+        {:ok, document}
+
+      {:error, _changeset} ->
+        {:postpone, :error}
+    end
   end
 
   # PubSub and async message handlers
@@ -764,8 +814,14 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
   end
 
   @impl true
+  def handle_info({:document_progress, document_id, current, total}, socket) do
+    progress = Map.put(socket.assigns.document_progress, document_id, {current, total})
+    {:noreply, assign(socket, :document_progress, progress)}
+  end
+
+  @impl true
   def handle_info({:diagram_created, _diagram_id}, socket) do
-    {:noreply, socket |> load_diagrams()}
+    {:noreply, socket |> load_diagrams() |> load_tags()}
   end
 
   @impl true
@@ -777,6 +833,56 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
     schedule_document_refresh()
 
     {:noreply, assign(socket, :documents, documents)}
+  end
+
+  @impl true
+  def handle_info({:do_fix_syntax, diagram}, socket) do
+    user_id = socket.assigns.current_user.id
+
+    case Diagrams.fix_diagram_syntax(diagram) do
+      {:ok, fixed_source} ->
+        case Diagrams.update_diagram(diagram, %{diagram_source: fixed_source}, user_id) do
+          {:ok, updated_diagram} ->
+            {:noreply,
+             socket
+             |> assign(:fixing_syntax, false)
+             |> assign(:selected_diagram, updated_diagram)
+             |> put_flash(:info, "Syntax fixed successfully!")}
+
+          {:error, _reason} ->
+            {:noreply,
+             socket
+             |> assign(:fixing_syntax, false)
+             |> put_flash(:error, "Failed to save fixed diagram")}
+        end
+
+      {:error, reason} ->
+        {:noreply,
+         socket
+         |> assign(:fixing_syntax, false)
+         |> put_flash(:error, "Failed to fix syntax: #{reason}")}
+    end
+  end
+
+  @impl true
+  def handle_info({:do_fix_generated_syntax, diagram}, socket) do
+    case Diagrams.fix_diagram_syntax_source(diagram.diagram_source, diagram.summary) do
+      {:ok, fixed_source} ->
+        updated_diagram = %{diagram | diagram_source: fixed_source}
+
+        {:noreply,
+         socket
+         |> assign(:fixing_syntax, false)
+         |> assign(:selected_diagram, updated_diagram)
+         |> assign(:generated_diagram, updated_diagram)
+         |> put_flash(:info, "Syntax fixed! Review and save the diagram.")}
+
+      {:error, reason} ->
+        {:noreply,
+         socket
+         |> assign(:fixing_syntax, false)
+         |> put_flash(:error, "Failed to fix syntax: #{reason}")}
+    end
   end
 
   # Private helper functions
@@ -891,7 +997,8 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
     show_public = socket.assigns[:show_public_diagrams] || false
 
     tag_counts = compute_tag_counts(user_id, show_public)
-    available_tags = tag_counts |> Map.keys() |> Enum.sort()
+    # Sort tags alphabetically, case-insensitive
+    available_tags = tag_counts |> Map.keys() |> Enum.sort_by(&String.downcase/1)
 
     socket
     |> assign(:available_tags, available_tags)
@@ -945,6 +1052,11 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
   defp upload_error_to_string(:not_accepted), do: "Invalid file type (use PDF, Markdown, or Text)"
   defp upload_error_to_string(:too_many_files), do: "Only one file can be uploaded at a time"
   defp upload_error_to_string(_), do: "Upload error"
+
+  defp visibility_tooltip(:private), do: "Only you can view"
+  defp visibility_tooltip(:unlisted), do: "Anyone with the link"
+  defp visibility_tooltip(:public), do: "Discoverable by all"
+  defp visibility_tooltip(_), do: ""
 
   @impl true
   def render(assigns) do
@@ -1087,9 +1199,40 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
               <%= if @uploads.document.entries != [] do %>
                 <button
                   type="submit"
-                  class="w-full mt-2 px-3 py-2 text-sm bg-blue-600 hover:bg-blue-700 rounded transition"
+                  disabled={@uploading}
+                  class={[
+                    "w-full mt-2 px-3 py-2 text-sm rounded transition flex items-center justify-center gap-2",
+                    @uploading && "bg-blue-600/50 cursor-not-allowed",
+                    !@uploading && "bg-blue-600 hover:bg-blue-700"
+                  ]}
                 >
-                  Upload
+                  <%= if @uploading do %>
+                    <svg
+                      class="animate-spin h-4 w-4"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        class="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        stroke-width="4"
+                      >
+                      </circle>
+                      <path
+                        class="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      >
+                      </path>
+                    </svg>
+                    <span>Uploading...</span>
+                  <% else %>
+                    Upload
+                  <% end %>
                 </button>
               <% end %>
             </form>
@@ -1114,6 +1257,19 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
                           {format_status(doc.status)}
                         </span>
                       </div>
+                      <%= if doc.status == :processing do %>
+                        <% progress = Map.get(@document_progress, doc.id) %>
+                        <%= if progress do %>
+                          <% {current, total} = progress %>
+                          <div class="text-xs text-yellow-400 mt-1">
+                            Generating diagram {current}/{total}
+                          </div>
+                        <% else %>
+                          <div class="text-xs text-slate-400 mt-1">
+                            Extracting text...
+                          </div>
+                        <% end %>
+                      <% end %>
                       <%= if doc.status == :error and doc.error_message do %>
                         <div class="text-xs text-red-400 mt-1">
                           {doc.error_message}
@@ -1129,10 +1285,40 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
             <div class="bg-slate-900 rounded-xl p-4 flex flex-col overflow-hidden flex-1">
               <%!-- Tag Cloud - clickable tags for filtering --%>
               <%= if @tag_counts != %{} do %>
+                <% filtered_tags =
+                  if String.length(@tag_search) >= 3 do
+                    search_lower = String.downcase(@tag_search)
+
+                    @tag_counts
+                    |> Enum.filter(fn {tag, _count} ->
+                      String.contains?(String.downcase(tag), search_lower)
+                    end)
+                  else
+                    @tag_counts |> Enum.to_list()
+                  end %>
                 <div class="mb-3 pb-3 border-b border-slate-800">
                   <h2 class="text-lg font-semibold mb-2">Available Tags ({map_size(@tag_counts)})</h2>
+                  <div class="relative mb-2">
+                    <input
+                      type="text"
+                      value={@tag_search}
+                      placeholder="Search tags..."
+                      phx-keyup="search_tags"
+                      phx-debounce="300"
+                      class="w-full px-3 py-1.5 pr-8 text-sm bg-slate-800 border border-slate-700 rounded-lg text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                    <%= if @tag_search != "" do %>
+                      <button
+                        type="button"
+                        phx-click="clear_tag_search"
+                        class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200"
+                      >
+                        <.icon name="hero-x-mark" class="w-4 h-4" />
+                      </button>
+                    <% end %>
+                  </div>
                   <div class="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
-                    <%= for {tag, count} <- Enum.sort_by(@tag_counts, fn {_tag, count} -> -count end) do %>
+                    <%= for {tag, count} <- Enum.sort_by(filtered_tags, fn {tag, _count} -> String.downcase(tag) end) do %>
                       <button
                         type="button"
                         phx-click="add_tag_to_filter"
@@ -1149,6 +1335,9 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
                         <span>{tag}</span>
                         <span class="text-slate-400">({count})</span>
                       </button>
+                    <% end %>
+                    <%= if filtered_tags == [] and String.length(@tag_search) >= 3 do %>
+                      <span class="text-sm text-slate-500 italic">No matching tags</span>
                     <% end %>
                   </div>
                 </div>
@@ -1507,32 +1696,35 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
             <div class="bg-slate-900 rounded-xl p-6 flex-1 overflow-auto">
               <%= if @selected_diagram do %>
                 <div class="space-y-4">
-                  <%!-- Visibility Banner --%>
-                  <div class={[
-                    "px-4 py-2 rounded-lg border flex items-center justify-between",
-                    @selected_diagram.visibility == :private && "bg-red-900/20 border-red-700/50",
-                    @selected_diagram.visibility == :unlisted &&
-                      "bg-yellow-900/20 border-yellow-700/50",
-                    @selected_diagram.visibility == :public && "bg-green-900/20 border-green-700/50"
-                  ]}>
-                    <div class="flex items-center gap-2">
-                      <span class="text-sm font-medium">
-                        Visibility:
-                        <%= case @selected_diagram.visibility do %>
-                          <% :private -> %>
-                            <span class="text-red-400">Private</span> - Only you can view
-                          <% :unlisted -> %>
-                            <span class="text-yellow-400">Unlisted</span> - Anyone with the link
-                          <% :public -> %>
-                            <span class="text-green-400">Public</span> - Discoverable by all
-                        <% end %>
-                      </span>
-                    </div>
-                  </div>
-
                   <div class="grid grid-cols-2 gap-6">
                     <div>
-                      <h2 class="text-2xl font-semibold mb-2">{@selected_diagram.title}</h2>
+                      <div class="flex items-center gap-2 mb-2">
+                        <h2 class="text-2xl font-semibold">{@selected_diagram.title}</h2>
+                        <span
+                          class={[
+                            "inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium",
+                            @selected_diagram.visibility == :private &&
+                              "bg-red-900/30 text-red-400",
+                            @selected_diagram.visibility == :unlisted &&
+                              "bg-yellow-900/30 text-yellow-400",
+                            @selected_diagram.visibility == :public &&
+                              "bg-green-900/30 text-green-400"
+                          ]}
+                          title={visibility_tooltip(@selected_diagram.visibility)}
+                        >
+                          <%= case @selected_diagram.visibility do %>
+                            <% :private -> %>
+                              <.icon name="hero-lock-closed" class="w-3.5 h-3.5" />
+                              <span>Private</span>
+                            <% :unlisted -> %>
+                              <.icon name="hero-link" class="w-3.5 h-3.5" />
+                              <span>Unlisted</span>
+                            <% :public -> %>
+                              <.icon name="hero-globe-alt" class="w-3.5 h-3.5" />
+                              <span>Public</span>
+                          <% end %>
+                        </span>
+                      </div>
                       <p class="text-slate-300 mb-2">{@selected_diagram.summary}</p>
                       <p class="text-sm text-slate-400 mb-2">
                         Source:
@@ -1579,16 +1771,109 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
                           id="copy-share-link-btn"
                           class="px-3 py-1 text-xs bg-cyan-800 hover:bg-cyan-700 text-white rounded transition whitespace-nowrap"
                         >
-                          Copy Share Link
+                          Copy Link
                         </button>
 
-                        <%= if @current_user && Diagrams.can_edit_diagram?(@selected_diagram, @current_user) do %>
+                        <%!-- Unsaved diagram buttons --%>
+                        <%= if @generated_diagram do %>
+                          <button
+                            phx-click="save_generated_diagram"
+                            class="px-3 py-1 text-xs bg-green-700 hover:bg-green-600 text-white rounded transition whitespace-nowrap"
+                          >
+                            Save
+                          </button>
+                          <button
+                            phx-click="fix_generated_syntax"
+                            disabled={@fixing_syntax}
+                            class={[
+                              "px-3 py-1 text-xs text-white rounded transition whitespace-nowrap flex items-center gap-1",
+                              @fixing_syntax && "bg-orange-800/50 cursor-wait",
+                              !@fixing_syntax && "bg-orange-700 hover:bg-orange-600"
+                            ]}
+                          >
+                            <%= if @fixing_syntax do %>
+                              <svg
+                                class="animate-spin h-3 w-3"
+                                xmlns="http://www.w3.org/2000/svg"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                              >
+                                <circle
+                                  class="opacity-25"
+                                  cx="12"
+                                  cy="12"
+                                  r="10"
+                                  stroke="currentColor"
+                                  stroke-width="4"
+                                >
+                                </circle>
+                                <path
+                                  class="opacity-75"
+                                  fill="currentColor"
+                                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                >
+                                </path>
+                              </svg>
+                              <span>Fixing...</span>
+                            <% else %>
+                              Fix Syntax
+                            <% end %>
+                          </button>
+                          <button
+                            phx-click="discard_generated_diagram"
+                            class="px-3 py-1 text-xs bg-slate-700 hover:bg-slate-600 text-white rounded transition whitespace-nowrap"
+                          >
+                            Discard
+                          </button>
+                        <% end %>
+
+                        <%!-- Saved diagram owner buttons --%>
+                        <%= if !@generated_diagram && @current_user && Diagrams.can_edit_diagram?(@selected_diagram, @current_user) do %>
                           <button
                             phx-click="edit_diagram"
                             phx-value-id={@selected_diagram.id}
                             class="px-3 py-1 text-xs bg-blue-800 hover:bg-blue-700 text-white rounded transition whitespace-nowrap"
                           >
                             Edit
+                          </button>
+
+                          <button
+                            phx-click="fix_syntax"
+                            phx-value-id={@selected_diagram.id}
+                            disabled={@fixing_syntax}
+                            class={[
+                              "px-3 py-1 text-xs text-white rounded transition whitespace-nowrap flex items-center gap-1",
+                              @fixing_syntax && "bg-orange-800/50 cursor-wait",
+                              !@fixing_syntax && "bg-orange-700 hover:bg-orange-600"
+                            ]}
+                          >
+                            <%= if @fixing_syntax do %>
+                              <svg
+                                class="animate-spin h-3 w-3"
+                                xmlns="http://www.w3.org/2000/svg"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                              >
+                                <circle
+                                  class="opacity-25"
+                                  cx="12"
+                                  cy="12"
+                                  r="10"
+                                  stroke="currentColor"
+                                  stroke-width="4"
+                                >
+                                </circle>
+                                <path
+                                  class="opacity-75"
+                                  fill="currentColor"
+                                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                                >
+                                </path>
+                              </svg>
+                              <span>Fixing...</span>
+                            <% else %>
+                              Fix Syntax
+                            <% end %>
                           </button>
 
                           <button
@@ -1601,44 +1886,37 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
                           </button>
                         <% end %>
 
-                        <%= if @current_user do %>
-                          <%= if Diagrams.user_owns_diagram?(@selected_diagram.id, @current_user.id) do %>
-                            <%!-- Owner can fork their own diagram --%>
+                        <%!-- Show Bookmark/Fork only for non-owners and saved diagrams --%>
+                        <%= if @current_user && !@generated_diagram && !Diagrams.user_owns_diagram?(@selected_diagram.id, @current_user.id) do %>
+                          <%= if Diagrams.user_bookmarked_diagram?(@selected_diagram.id, @current_user.id) do %>
                             <button
-                              phx-click="fork_diagram"
+                              phx-click="remove_bookmark"
                               phx-value-id={@selected_diagram.id}
-                              class="px-3 py-1 text-xs bg-purple-800 hover:bg-purple-700 text-white rounded transition whitespace-nowrap"
+                              class="px-3 py-1 text-xs bg-amber-800 hover:bg-amber-700 text-white rounded transition whitespace-nowrap"
                             >
-                              Fork
+                              Remove Bookmark
                             </button>
                           <% else %>
-                            <%= if Diagrams.user_bookmarked_diagram?(@selected_diagram.id, @current_user.id) do %>
-                              <button
-                                phx-click="remove_bookmark"
-                                phx-value-id={@selected_diagram.id}
-                                class="px-3 py-1 text-xs bg-amber-800 hover:bg-amber-700 text-white rounded transition whitespace-nowrap"
-                              >
-                                Remove Bookmark
-                              </button>
-                            <% else %>
-                              <button
-                                phx-click="bookmark_diagram"
-                                phx-value-id={@selected_diagram.id}
-                                class="px-3 py-1 text-xs bg-green-800 hover:bg-green-700 text-white rounded transition whitespace-nowrap"
-                              >
-                                Bookmark
-                              </button>
-                            <% end %>
-
                             <button
-                              phx-click="fork_diagram"
+                              phx-click="bookmark_diagram"
                               phx-value-id={@selected_diagram.id}
-                              class="px-3 py-1 text-xs bg-purple-800 hover:bg-purple-700 text-white rounded transition whitespace-nowrap"
+                              class="px-3 py-1 text-xs bg-green-800 hover:bg-green-700 text-white rounded transition whitespace-nowrap"
                             >
-                              Fork
+                              Bookmark
                             </button>
                           <% end %>
-                        <% else %>
+
+                          <button
+                            phx-click="fork_diagram"
+                            phx-value-id={@selected_diagram.id}
+                            class="px-3 py-1 text-xs bg-purple-800 hover:bg-purple-700 text-white rounded transition whitespace-nowrap"
+                          >
+                            Fork
+                          </button>
+                        <% end %>
+
+                        <%!-- Show Fork for non-logged-in users viewing saved diagrams --%>
+                        <%= if is_nil(@current_user) && !@generated_diagram do %>
                           <button
                             phx-click="fork_diagram"
                             phx-value-id={@selected_diagram.id}
@@ -1650,23 +1928,6 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
                       </div>
                     </div>
                   </div>
-
-                  <%= if @generated_diagram do %>
-                    <div class="flex gap-3 p-4 bg-blue-900/20 border border-blue-700/50 rounded-lg">
-                      <button
-                        phx-click="save_generated_diagram"
-                        class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors flex-1"
-                      >
-                        Save Diagram
-                      </button>
-                      <button
-                        phx-click="discard_generated_diagram"
-                        class="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-medium transition-colors flex-1"
-                      >
-                        Discard
-                      </button>
-                    </div>
-                  <% end %>
 
                   <div
                     id="mermaid-preview"

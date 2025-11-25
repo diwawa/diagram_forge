@@ -306,19 +306,35 @@ defmodule DiagramForge.Diagrams do
   Creates a diagram with user ownership.
 
   Creates both the diagram and the user_diagrams entry with is_owner: true.
+  Broadcasts `:diagram_created` message for real-time UI updates.
   """
   def create_diagram_for_user(attrs, user_id) do
-    Repo.transaction(fn ->
-      diagram_changeset = Diagram.changeset(%Diagram{}, attrs)
+    result =
+      Repo.transaction(fn ->
+        diagram_changeset = Diagram.changeset(%Diagram{}, attrs)
 
-      case Repo.insert(diagram_changeset) do
-        {:ok, diagram} ->
-          create_user_diagram_entry(diagram, user_id)
+        case Repo.insert(diagram_changeset) do
+          {:ok, diagram} ->
+            create_user_diagram_entry(diagram, user_id)
 
-        {:error, changeset} ->
-          Repo.rollback(changeset)
-      end
-    end)
+          {:error, changeset} ->
+            Repo.rollback(changeset)
+        end
+      end)
+
+    case result do
+      {:ok, diagram} ->
+        Phoenix.PubSub.broadcast(
+          DiagramForge.PubSub,
+          "diagrams",
+          {:diagram_created, diagram.id}
+        )
+
+        {:ok, diagram}
+
+      error ->
+        error
+    end
   end
 
   defp create_user_diagram_entry(diagram, user_id) do
@@ -380,6 +396,87 @@ defmodule DiagramForge.Diagrams do
     DiagramGenerator.generate_from_prompt(prompt, opts)
   end
 
+  @doc """
+  Attempts to fix Mermaid syntax errors in a diagram using AI.
+
+  Takes a diagram with broken Mermaid syntax and returns {:ok, fixed_source}
+  or {:error, reason} on failure.
+
+  ## Options
+
+    * `:ai_client` - AI client module to use (defaults to configured client)
+
+  """
+  def fix_diagram_syntax(%Diagram{} = diagram, opts \\ []) do
+    alias DiagramForge.AI.Client
+    alias DiagramForge.AI.Prompts
+
+    ai_client = opts[:ai_client] || Application.get_env(:diagram_forge, :ai_client, Client)
+    user_prompt = Prompts.fix_mermaid_syntax_prompt(diagram.diagram_source, diagram.summary)
+
+    try do
+      json =
+        ai_client.chat!(
+          [
+            %{"role" => "system", "content" => Prompts.diagram_system_prompt()},
+            %{"role" => "user", "content" => user_prompt}
+          ],
+          []
+        )
+        |> Jason.decode!()
+
+      case json do
+        %{"mermaid" => fixed_mermaid} when is_binary(fixed_mermaid) ->
+          {:ok, fixed_mermaid}
+
+        _ ->
+          {:error, "Invalid response from AI"}
+      end
+    rescue
+      e -> {:error, Exception.message(e)}
+    end
+  end
+
+  @doc """
+  Attempts to fix Mermaid syntax errors using AI, working directly with source code.
+
+  This is useful for fixing unsaved/generated diagrams that don't have an ID yet.
+
+  ## Options
+
+    * `:ai_client` - AI client module to use (defaults to configured client)
+
+  """
+  def fix_diagram_syntax_source(diagram_source, summary, opts \\ []) do
+    alias DiagramForge.AI.Client
+    alias DiagramForge.AI.Prompts
+
+    ai_client = opts[:ai_client] || Application.get_env(:diagram_forge, :ai_client, Client)
+    user_prompt = Prompts.fix_mermaid_syntax_prompt(diagram_source, summary)
+
+    try do
+      json =
+        ai_client.chat!(
+          [
+            %{"role" => "system", "content" => Prompts.diagram_system_prompt()},
+            %{"role" => "user", "content" => user_prompt}
+          ],
+          []
+        )
+        |> Jason.decode!()
+
+      case json do
+        %{"mermaid" => fixed_mermaid} when is_binary(fixed_mermaid) ->
+          {:ok, fixed_mermaid}
+
+        _ ->
+          {:error, "Invalid response from AI"}
+      end
+    rescue
+      e -> {:error, Exception.message(e)}
+    end
+  end
+
   # Tag Management Functions
 
   @doc """
@@ -398,7 +495,7 @@ defmodule DiagramForge.Diagrams do
     Repo.all(query)
     |> List.flatten()
     |> Enum.uniq()
-    |> Enum.sort()
+    |> Enum.sort_by(&String.downcase/1)
   end
 
   @doc """
