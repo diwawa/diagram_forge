@@ -941,6 +941,11 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
     end
   end
 
+  defp upload_error_to_string(:too_large), do: "File is too large (max 2MB)"
+  defp upload_error_to_string(:not_accepted), do: "Invalid file type (use PDF, Markdown, or Text)"
+  defp upload_error_to_string(:too_many_files), do: "Only one file can be uploaded at a time"
+  defp upload_error_to_string(_), do: "Upload error"
+
   @impl true
   def render(assigns) do
     ~H"""
@@ -1070,6 +1075,13 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
                 <div class="text-xs text-slate-300 mt-1">
                   {entry.client_name}
                 </div>
+                <%= for err <- upload_errors(@uploads.document, entry) do %>
+                  <p class="text-xs text-red-400 mt-1">{upload_error_to_string(err)}</p>
+                <% end %>
+              <% end %>
+
+              <%= for err <- upload_errors(@uploads.document) do %>
+                <p class="text-xs text-red-400 mt-1">{upload_error_to_string(err)}</p>
               <% end %>
 
               <%= if @uploads.document.entries != [] do %>

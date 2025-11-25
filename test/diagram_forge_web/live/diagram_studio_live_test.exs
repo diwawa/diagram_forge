@@ -215,6 +215,119 @@ defmodule DiagramForgeWeb.DiagramStudioLiveTest do
       # (button only appears after selecting a file)
       refute has_element?(view, "#upload-form button[type='submit']")
     end
+
+    test "rejects files with invalid type", %{conn: conn} do
+      user = fixture(:user)
+      conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      # Try to upload a .exe file (not accepted)
+      invalid_file =
+        file_input(view, "#upload-form", :document, [
+          %{
+            name: "malware.exe",
+            content: "fake executable content",
+            type: "application/octet-stream"
+          }
+        ])
+
+      render_upload(invalid_file, "malware.exe")
+
+      # Should display error message
+      assert render(view) =~ "Invalid file type"
+    end
+
+    test "rejects files that are too large", %{conn: conn} do
+      user = fixture(:user)
+      conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      # Create content larger than 2MB (2_000_000 bytes)
+      large_content = String.duplicate("x", 2_500_000)
+
+      large_file =
+        file_input(view, "#upload-form", :document, [
+          %{
+            name: "large_document.txt",
+            content: large_content,
+            type: "text/plain"
+          }
+        ])
+
+      render_upload(large_file, "large_document.txt")
+
+      # Should display error message
+      assert render(view) =~ "File is too large"
+    end
+
+    test "accepts valid PDF files", %{conn: conn} do
+      user = fixture(:user)
+      conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      valid_file =
+        file_input(view, "#upload-form", :document, [
+          %{
+            name: "document.pdf",
+            content: "PDF content",
+            type: "application/pdf"
+          }
+        ])
+
+      render_upload(valid_file, "document.pdf")
+
+      # Should show the file name without errors
+      html = render(view)
+      assert html =~ "document.pdf"
+      refute html =~ "Invalid file type"
+      refute html =~ "File is too large"
+    end
+
+    test "accepts valid text files", %{conn: conn} do
+      user = fixture(:user)
+      conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      valid_file =
+        file_input(view, "#upload-form", :document, [
+          %{
+            name: "notes.txt",
+            content: "Some text content for diagram generation",
+            type: "text/plain"
+          }
+        ])
+
+      render_upload(valid_file, "notes.txt")
+
+      # Should show the file name without errors
+      html = render(view)
+      assert html =~ "notes.txt"
+      refute html =~ "Invalid file type"
+      refute html =~ "File is too large"
+    end
+
+    test "accepts valid markdown files", %{conn: conn} do
+      user = fixture(:user)
+      conn = Plug.Test.init_test_session(conn, %{user_id: user.id})
+      {:ok, view, _html} = live(conn, ~p"/")
+
+      valid_file =
+        file_input(view, "#upload-form", :document, [
+          %{
+            name: "readme.md",
+            content: "# Heading\n\nSome markdown content",
+            type: "text/markdown"
+          }
+        ])
+
+      render_upload(valid_file, "readme.md")
+
+      # Should show the file name without errors
+      html = render(view)
+      assert html =~ "readme.md"
+      refute html =~ "Invalid file type"
+      refute html =~ "File is too large"
+    end
   end
 
   describe "tag filtering" do
