@@ -23,7 +23,9 @@ defmodule DiagramForge.Fixtures do
   Builds a struct without inserting it into the database.
   """
   def build(:document, attrs) do
-    %Document{}
+    user = attrs[:user] || fixture(:user)
+
+    %Document{user_id: user.id}
     |> Document.changeset(
       attrs
       |> Enum.into(%{

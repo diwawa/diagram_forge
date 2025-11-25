@@ -645,7 +645,9 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
           path: dest
         }
 
-        case Diagrams.create_document(attrs) do
+        user_id = socket.assigns.current_user.id
+
+        case Diagrams.create_document(attrs, user_id) do
           {:ok, document} ->
             %{"document_id" => document.id}
             |> ProcessDocumentJob.new()

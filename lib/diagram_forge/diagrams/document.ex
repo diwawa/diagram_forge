@@ -12,6 +12,8 @@ defmodule DiagramForge.Diagrams.Document do
   @foreign_key_type :binary_id
 
   schema "documents" do
+    belongs_to :user, DiagramForge.Accounts.User
+
     field :title, :string
     field :source_type, Ecto.Enum, values: [:pdf, :markdown]
     field :path, :string
@@ -37,5 +39,6 @@ defmodule DiagramForge.Diagrams.Document do
       empty_values: []
     )
     |> validate_required([:title, :source_type, :path])
+    |> foreign_key_constraint(:user_id)
   end
 end

@@ -32,11 +32,11 @@ seed_user =
 
 IO.puts("Seed user created with ID: #{seed_user.id}")
 
-# Create a seed document
+# Create a seed document (owned by seed user)
 IO.puts("Creating seed document...")
 
 document =
-  %Document{}
+  %Document{user_id: seed_user.id}
   |> Document.changeset(%{
     title: "Distributed Systems & ML Architecture Patterns",
     source_type: :markdown,

@@ -22,6 +22,7 @@ defmodule DiagramForge.Accounts.User do
     many_to_many :diagrams, DiagramForge.Diagrams.Diagram,
       join_through: DiagramForge.Diagrams.UserDiagram
 
+    has_many :documents, DiagramForge.Diagrams.Document
     has_many :saved_filters, DiagramForge.Diagrams.SavedFilter, foreign_key: :user_id
 
     timestamps()

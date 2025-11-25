@@ -4,6 +4,7 @@ defmodule DiagramForge.Repo.Migrations.CreateDocuments do
   def change do
     create table(:documents, primary_key: false) do
       add :id, :binary_id, primary_key: true
+      add :user_id, references(:users, type: :binary_id, on_delete: :delete_all), null: false
       add :title, :string, null: false
       add :source_type, :string, null: false
       add :path, :string, null: false
@@ -16,5 +17,6 @@ defmodule DiagramForge.Repo.Migrations.CreateDocuments do
     end
 
     create index(:documents, [:status])
+    create index(:documents, [:user_id])
   end
 end

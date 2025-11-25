@@ -74,31 +74,31 @@ defmodule DiagramForge.Diagrams do
   end
 
   @doc """
-  Creates a document.
+  Creates a document for a user.
 
   ## Examples
 
-      iex> create_document(%{title: "My Doc", source_type: :pdf, path: "/path/to/doc.pdf"})
+      iex> create_document(%{title: "My Doc", source_type: :pdf, path: "/path/to/doc.pdf"}, user_id)
       {:ok, %Document{}}
 
   """
-  def create_document(attrs \\ %{}) do
-    %Document{}
+  def create_document(attrs, user_id) do
+    %Document{user_id: user_id}
     |> Document.changeset(attrs)
     |> Repo.insert()
   end
 
   @doc """
-  Creates a document and enqueues it for processing.
+  Creates a document for a user and enqueues it for processing.
 
   ## Examples
 
-      iex> upload_document(%{title: "My Doc", source_type: :pdf, path: "/path/to/doc.pdf"})
+      iex> upload_document(%{title: "My Doc", source_type: :pdf, path: "/path/to/doc.pdf"}, user_id)
       {:ok, %Document{}}
 
   """
-  def upload_document(attrs \\ %{}) do
-    changeset = Document.changeset(%Document{}, attrs)
+  def upload_document(attrs, user_id) do
+    changeset = Document.changeset(%Document{user_id: user_id}, attrs)
 
     case Repo.insert(changeset) do
       {:ok, document} ->
