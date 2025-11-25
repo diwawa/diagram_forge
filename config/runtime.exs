@@ -14,9 +14,11 @@ unless config_env() == :test do
     model: "gpt-4o-mini"
 end
 
-# Configure superadmin
-config :diagram_forge,
-  superadmin_email: System.get_env("DF_SUPERADMIN_USER")
+# Configure superadmin (test environment uses config/test.exs)
+unless config_env() == :test do
+  config :diagram_forge,
+    superadmin_email: System.get_env("DF_SUPERADMIN_USER")
+end
 
 # Support, contact, and legal links
 config :diagram_forge,

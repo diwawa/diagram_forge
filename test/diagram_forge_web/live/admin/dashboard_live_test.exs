@@ -3,16 +3,7 @@ defmodule DiagramForgeWeb.Admin.DashboardLiveTest do
 
   import Phoenix.LiveViewTest
 
-  setup do
-    # Set up superadmin email for testing
-    Application.put_env(:diagram_forge, :superadmin_email, "admin@example.com")
-
-    on_exit(fn ->
-      Application.delete_env(:diagram_forge, :superadmin_email)
-    end)
-
-    :ok
-  end
+  # superadmin_email is configured in config/test.exs as "admin@example.com"
 
   describe "access control" do
     test "redirects to home when not authenticated", %{conn: conn} do

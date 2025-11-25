@@ -81,8 +81,16 @@ config :backpex,
 # Configure Oban
 config :diagram_forge, Oban,
   engine: Oban.Engines.Basic,
-  queues: [documents: 5, diagrams: 10],
-  repo: DiagramForge.Repo
+  queues: [default: 10, documents: 5, diagrams: 10],
+  repo: DiagramForge.Repo,
+  plugins: [
+    Oban.Plugins.Pruner,
+    {Oban.Plugins.Cron,
+     crontab: [
+       # Check usage alerts every hour
+       {"0 * * * *", DiagramForge.Usage.Workers.CheckAlertsWorker}
+     ]}
+  ]
 
 # Configure Ueberauth for GitHub OAuth
 config :ueberauth, Ueberauth,

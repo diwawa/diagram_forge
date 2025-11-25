@@ -153,7 +153,7 @@ defmodule DiagramForge.Usage do
   # ============================================================================
 
   defp update_daily_aggregate(%TokenUsage{} = usage) do
-    date = DateTime.to_date(usage.inserted_at)
+    date = NaiveDateTime.to_date(usage.inserted_at)
 
     # Use upsert to atomically increment counters
     Repo.insert(
@@ -215,17 +215,26 @@ defmodule DiagramForge.Usage do
   def get_monthly_summary(year, month) do
     {start_date, end_date} = month_date_range(year, month)
 
-    DailyAggregate
-    |> where([d], d.date >= ^start_date and d.date <= ^end_date)
-    |> select([d], %{
-      cost_cents: sum(d.cost_cents),
-      request_count: sum(d.request_count),
-      total_tokens: sum(d.total_tokens),
-      input_tokens: sum(d.input_tokens),
-      output_tokens: sum(d.output_tokens)
-    })
-    |> Repo.one() ||
-      %{cost_cents: 0, request_count: 0, total_tokens: 0, input_tokens: 0, output_tokens: 0}
+    result =
+      DailyAggregate
+      |> where([d], d.date >= ^start_date and d.date <= ^end_date)
+      |> select([d], %{
+        cost_cents: sum(d.cost_cents),
+        request_count: sum(d.request_count),
+        total_tokens: sum(d.total_tokens),
+        input_tokens: sum(d.input_tokens),
+        output_tokens: sum(d.output_tokens)
+      })
+      |> Repo.one()
+
+    # SQL sum() returns nil when there are no rows, so coalesce to 0
+    %{
+      cost_cents: result.cost_cents || 0,
+      request_count: result.request_count || 0,
+      total_tokens: result.total_tokens || 0,
+      input_tokens: result.input_tokens || 0,
+      output_tokens: result.output_tokens || 0
+    }
   end
 
   @doc """
@@ -286,4 +295,273 @@ defmodule DiagramForge.Usage do
   end
 
   def format_cents(_), do: "0.00"
+
+  # ============================================================================
+  # Alert Thresholds
+  # ============================================================================
+
+  alias DiagramForge.Usage.{Alert, AlertThreshold}
+
+  @doc """
+  Lists all active alert thresholds.
+  """
+  def list_active_thresholds do
+    AlertThreshold
+    |> where([t], t.is_active == true)
+    |> Repo.all()
+  end
+
+  @doc """
+  Gets a threshold by name.
+  """
+  def get_threshold_by_name(name) do
+    Repo.get_by(AlertThreshold, name: name)
+  end
+
+  @doc """
+  Creates a new alert threshold.
+  """
+  def create_threshold(attrs) do
+    %AlertThreshold{}
+    |> AlertThreshold.changeset(attrs)
+    |> Repo.insert()
+  end
+
+  @doc """
+  Updates an alert threshold.
+  """
+  def update_threshold(%AlertThreshold{} = threshold, attrs) do
+    threshold
+    |> AlertThreshold.changeset(attrs)
+    |> Repo.update()
+  end
+
+  # ============================================================================
+  # Alert Checking & Creation
+  # ============================================================================
+
+  @doc """
+  Checks all active thresholds and creates alerts for any that are exceeded.
+  Returns a list of newly created alerts.
+  """
+  def check_all_thresholds do
+    thresholds = list_active_thresholds()
+
+    Enum.flat_map(thresholds, fn threshold ->
+      case check_threshold(threshold) do
+        {:ok, alerts} -> alerts
+        {:error, _} -> []
+      end
+    end)
+  end
+
+  @doc """
+  Checks a single threshold and creates alerts if exceeded.
+  """
+  def check_threshold(%AlertThreshold{} = threshold) do
+    {start_date, end_date} = threshold_period_range(threshold)
+
+    case threshold.scope do
+      "total" ->
+        check_total_threshold(threshold, start_date, end_date)
+
+      "per_user" ->
+        check_per_user_threshold(threshold, start_date, end_date)
+    end
+  end
+
+  defp threshold_period_range(%AlertThreshold{period: "daily"}) do
+    today = Date.utc_today()
+    {today, today}
+  end
+
+  defp threshold_period_range(%AlertThreshold{period: "monthly"}) do
+    today = Date.utc_today()
+    start_date = Date.beginning_of_month(today)
+    end_date = Date.end_of_month(today)
+    {start_date, end_date}
+  end
+
+  defp check_total_threshold(threshold, start_date, end_date) do
+    total_cost = get_total_cost_for_period(start_date, end_date)
+    threshold_exceeded = total_cost >= threshold.threshold_cents
+    alert_already_exists = alert_exists?(threshold.id, nil, start_date, end_date)
+
+    if threshold_exceeded and not alert_already_exists do
+      create_total_alert(threshold, start_date, end_date, total_cost)
+    else
+      {:ok, []}
+    end
+  end
+
+  defp create_total_alert(threshold, start_date, end_date, total_cost) do
+    case create_alert(%{
+           threshold_id: threshold.id,
+           user_id: nil,
+           period_start: start_date,
+           period_end: end_date,
+           amount_cents: total_cost
+         }) do
+      {:ok, alert} -> {:ok, [alert]}
+      error -> error
+    end
+  end
+
+  defp check_per_user_threshold(threshold, start_date, end_date) do
+    users_over_threshold =
+      get_users_over_threshold(threshold.threshold_cents, start_date, end_date)
+
+    alerts =
+      Enum.reduce(users_over_threshold, [], fn %{user_id: user_id, cost_cents: cost}, acc ->
+        maybe_create_user_alert(threshold, user_id, start_date, end_date, cost, acc)
+      end)
+
+    {:ok, alerts}
+  end
+
+  defp maybe_create_user_alert(threshold, user_id, start_date, end_date, cost, acc) do
+    if alert_exists?(threshold.id, user_id, start_date, end_date) do
+      acc
+    else
+      create_user_alert(threshold, user_id, start_date, end_date, cost, acc)
+    end
+  end
+
+  defp create_user_alert(threshold, user_id, start_date, end_date, cost, acc) do
+    case create_alert(%{
+           threshold_id: threshold.id,
+           user_id: user_id,
+           period_start: start_date,
+           period_end: end_date,
+           amount_cents: cost
+         }) do
+      {:ok, alert} -> [alert | acc]
+      _ -> acc
+    end
+  end
+
+  defp get_total_cost_for_period(start_date, end_date) do
+    DailyAggregate
+    |> where([d], d.date >= ^start_date and d.date <= ^end_date)
+    |> Repo.aggregate(:sum, :cost_cents) || 0
+  end
+
+  defp get_users_over_threshold(threshold_cents, start_date, end_date) do
+    DailyAggregate
+    |> where([d], d.date >= ^start_date and d.date <= ^end_date)
+    |> where([d], not is_nil(d.user_id))
+    |> group_by([d], d.user_id)
+    |> having([d], sum(d.cost_cents) >= ^threshold_cents)
+    |> select([d], %{user_id: d.user_id, cost_cents: sum(d.cost_cents)})
+    |> Repo.all()
+  end
+
+  defp alert_exists?(threshold_id, user_id, period_start, period_end) do
+    query =
+      Alert
+      |> where([a], a.threshold_id == ^threshold_id)
+      |> where([a], a.period_start == ^period_start)
+      |> where([a], a.period_end == ^period_end)
+
+    query =
+      if user_id do
+        where(query, [a], a.user_id == ^user_id)
+      else
+        where(query, [a], is_nil(a.user_id))
+      end
+
+    Repo.exists?(query)
+  end
+
+  @doc """
+  Creates a new usage alert.
+  """
+  def create_alert(attrs) do
+    %Alert{}
+    |> Alert.changeset(attrs)
+    |> Repo.insert()
+  end
+
+  @doc """
+  Marks an alert as email sent.
+  """
+  def mark_alert_email_sent(%Alert{} = alert) do
+    alert
+    |> Ecto.Changeset.change(email_sent_at: DateTime.utc_now() |> DateTime.truncate(:second))
+    |> Repo.update()
+  end
+
+  # ============================================================================
+  # Alert Queries
+  # ============================================================================
+
+  @doc """
+  Lists unacknowledged alerts.
+  """
+  def list_unacknowledged_alerts do
+    Alert
+    |> where([a], is_nil(a.acknowledged_at))
+    |> order_by([a], desc: a.inserted_at)
+    |> Repo.all()
+    |> Repo.preload([:threshold, :user])
+  end
+
+  @doc """
+  Counts unacknowledged alerts.
+  """
+  def count_unacknowledged_alerts do
+    Alert
+    |> where([a], is_nil(a.acknowledged_at))
+    |> Repo.aggregate(:count)
+  end
+
+  @doc """
+  Gets an alert by ID.
+  """
+  def get_alert(id) do
+    Alert
+    |> Repo.get(id)
+    |> Repo.preload([:threshold, :user, :acknowledged_by])
+  end
+
+  @doc """
+  Acknowledges an alert.
+  """
+  def acknowledge_alert(%Alert{} = alert, admin_user_id) do
+    alert
+    |> Alert.acknowledge_changeset(admin_user_id)
+    |> Repo.update()
+  end
+
+  @doc """
+  Lists all alerts with optional filters.
+  """
+  def list_alerts(opts \\ []) do
+    Alert
+    |> maybe_filter_acknowledged(opts[:acknowledged])
+    |> order_by([a], desc: a.inserted_at)
+    |> limit(^(opts[:limit] || 50))
+    |> Repo.all()
+    |> Repo.preload([:threshold, :user, :acknowledged_by])
+  end
+
+  defp maybe_filter_acknowledged(query, nil), do: query
+
+  defp maybe_filter_acknowledged(query, true),
+    do: where(query, [a], not is_nil(a.acknowledged_at))
+
+  defp maybe_filter_acknowledged(query, false),
+    do: where(query, [a], is_nil(a.acknowledged_at))
+
+  @doc """
+  Gets alerts that need email notifications sent.
+  """
+  def list_alerts_needing_email do
+    Alert
+    |> where([a], is_nil(a.email_sent_at))
+    |> join(:inner, [a], t in AlertThreshold, on: a.threshold_id == t.id)
+    |> where([a, t], t.notify_email == true)
+    |> Repo.all()
+    |> Repo.preload([:threshold, :user])
+  end
 end

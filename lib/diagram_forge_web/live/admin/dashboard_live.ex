@@ -11,6 +11,7 @@ defmodule DiagramForgeWeb.Admin.DashboardLive do
   alias DiagramForge.Diagrams.Diagram
   alias DiagramForge.Diagrams.Document
   alias DiagramForge.Repo
+  alias DiagramForge.Usage
 
   @impl true
   def render(assigns) do
@@ -34,6 +35,9 @@ defmodule DiagramForgeWeb.Admin.DashboardLive do
           </.link>
           <.link navigate={~p"/admin/prompts"} class="btn btn-ghost btn-sm">
             Prompts
+          </.link>
+          <.link navigate={~p"/admin/usage/dashboard"} class="btn btn-ghost btn-sm">
+            Usage
           </.link>
         </div>
 
@@ -79,6 +83,46 @@ defmodule DiagramForgeWeb.Admin.DashboardLive do
           <Backpex.HTML.CoreComponents.icon name="hero-chat-bubble-bottom-center-text" class="size-5" />
           Prompts
         </Backpex.HTML.Layout.sidebar_item>
+
+        <div class="divider my-2 text-xs text-base-content/50">API Usage</div>
+
+        <Backpex.HTML.Layout.sidebar_item
+          current_url={@current_url}
+          navigate={~p"/admin/usage/dashboard"}
+        >
+          <Backpex.HTML.CoreComponents.icon name="hero-chart-bar" class="size-5" /> Usage Dashboard
+        </Backpex.HTML.Layout.sidebar_item>
+        <Backpex.HTML.Layout.sidebar_item
+          current_url={@current_url}
+          navigate={~p"/admin/usage/alerts"}
+        >
+          <Backpex.HTML.CoreComponents.icon name="hero-bell-alert" class="size-5" /> Alerts
+          <span :if={@unacknowledged_alerts > 0} class="badge badge-error badge-sm ml-auto">
+            {@unacknowledged_alerts}
+          </span>
+        </Backpex.HTML.Layout.sidebar_item>
+        <Backpex.HTML.Layout.sidebar_item
+          current_url={@current_url}
+          navigate={~p"/admin/ai-providers"}
+        >
+          <Backpex.HTML.CoreComponents.icon name="hero-server" class="size-5" /> AI Providers
+        </Backpex.HTML.Layout.sidebar_item>
+        <Backpex.HTML.Layout.sidebar_item current_url={@current_url} navigate={~p"/admin/ai-models"}>
+          <Backpex.HTML.CoreComponents.icon name="hero-cpu-chip" class="size-5" /> AI Models
+        </Backpex.HTML.Layout.sidebar_item>
+        <Backpex.HTML.Layout.sidebar_item
+          current_url={@current_url}
+          navigate={~p"/admin/ai-model-prices"}
+        >
+          <Backpex.HTML.CoreComponents.icon name="hero-currency-dollar" class="size-5" /> Model Prices
+        </Backpex.HTML.Layout.sidebar_item>
+        <Backpex.HTML.Layout.sidebar_item
+          current_url={@current_url}
+          navigate={~p"/admin/alert-thresholds"}
+        >
+          <Backpex.HTML.CoreComponents.icon name="hero-adjustments-horizontal" class="size-5" />
+          Thresholds
+        </Backpex.HTML.Layout.sidebar_item>
       </:sidebar>
       <Backpex.HTML.Layout.flash_messages flash={@flash} />
 
@@ -87,8 +131,22 @@ defmodule DiagramForgeWeb.Admin.DashboardLive do
           <h1 class="text-2xl font-bold text-base-content">Dashboard</h1>
           <p class="mt-1 text-sm text-base-content/70">Platform overview and statistics</p>
         </div>
+        
+    <!-- Alert Banner -->
+        <div
+          :if={@unacknowledged_alerts > 0}
+          class="alert alert-warning shadow-lg"
+          role="alert"
+          id="usage-alert-banner"
+        >
+          <Backpex.HTML.CoreComponents.icon name="hero-exclamation-triangle" class="size-6" />
+          <span>
+            {@unacknowledged_alerts} usage alert(s) require attention
+          </span>
+          <.link navigate={~p"/admin/usage/alerts"} class="btn btn-sm">View Alerts</.link>
+        </div>
 
-        <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
           <.stat_card
             title="Total Users"
             value={@user_count}
@@ -106,6 +164,12 @@ defmodule DiagramForgeWeb.Admin.DashboardLive do
             value={@document_count}
             icon="hero-document-text"
             href={~p"/admin/documents"}
+          />
+          <.stat_card
+            title="Monthly Cost"
+            value={"$#{Usage.format_cents(@monthly_cost)}"}
+            icon="hero-currency-dollar"
+            href={~p"/admin/usage/dashboard"}
           />
         </div>
 
@@ -170,7 +234,7 @@ defmodule DiagramForgeWeb.Admin.DashboardLive do
   end
 
   attr :title, :string, required: true
-  attr :value, :integer, required: true
+  attr :value, :any, required: true
   attr :icon, :string, required: true
   attr :href, :string, required: true
 
@@ -203,6 +267,8 @@ defmodule DiagramForgeWeb.Admin.DashboardLive do
   end
 
   defp load_stats(socket) do
+    today = Date.utc_today()
+
     socket
     |> assign(:user_count, Repo.aggregate(User, :count))
     |> assign(:diagram_count, Repo.aggregate(Diagram, :count))
@@ -222,5 +288,7 @@ defmodule DiagramForgeWeb.Admin.DashboardLive do
     )
     |> assign(:docs_error, Repo.aggregate(from(d in Document, where: d.status == :error), :count))
     |> assign(:recent_users, Repo.all(from(u in User, order_by: [desc: u.inserted_at], limit: 5)))
+    |> assign(:monthly_cost, Usage.get_total_monthly_usage(today.year, today.month))
+    |> assign(:unacknowledged_alerts, Usage.count_unacknowledged_alerts())
   end
 end

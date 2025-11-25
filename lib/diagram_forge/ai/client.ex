@@ -53,9 +53,9 @@ defmodule DiagramForge.AI.Client do
            retry_opts
          ) do
       {:ok, content, usage} ->
-        # Track usage asynchronously if enabled (default: true)
+        # Track usage if enabled (default: true)
         if opts[:track_usage] != false do
-          track_usage(model, usage, opts)
+          usage_tracker().track_usage(model, usage, opts)
         end
 
         content
@@ -70,31 +70,8 @@ defmodule DiagramForge.AI.Client do
     end
   end
 
-  defp track_usage(model_api_name, usage, opts) do
-    # Track usage asynchronously to avoid blocking the response
-    # and to avoid database connection issues in tests
-    Task.start(fn ->
-      alias DiagramForge.Usage
-
-      # Look up the model by API name to get the model_id
-      case Usage.get_model_by_api_name(model_api_name) do
-        nil ->
-          Logger.warning("Unknown model for usage tracking: #{model_api_name}")
-
-        ai_model ->
-          Usage.record_usage(%{
-            model_id: ai_model.id,
-            user_id: opts[:user_id],
-            operation: opts[:operation] || "unknown",
-            input_tokens: usage["prompt_tokens"] || 0,
-            output_tokens: usage["completion_tokens"] || 0,
-            total_tokens: usage["total_tokens"] || 0,
-            metadata: %{
-              model_api_name: model_api_name
-            }
-          })
-      end
-    end)
+  defp usage_tracker do
+    Application.get_env(:diagram_forge, :usage_tracker, DiagramForge.Usage.Tracker)
   end
 
   # Private functions

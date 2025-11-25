@@ -31,6 +31,9 @@ defmodule DiagramForgeWeb.Admin.PromptEditLive do
           <.link navigate={~p"/admin/prompts"} class="btn btn-ghost btn-sm">
             Prompts
           </.link>
+          <.link navigate={~p"/admin/usage/dashboard"} class="btn btn-ghost btn-sm">
+            Usage
+          </.link>
         </div>
 
         <Backpex.HTML.Layout.topbar_dropdown>
@@ -74,6 +77,43 @@ defmodule DiagramForgeWeb.Admin.PromptEditLive do
         <Backpex.HTML.Layout.sidebar_item current_url={@current_url} navigate={~p"/admin/prompts"}>
           <Backpex.HTML.CoreComponents.icon name="hero-chat-bubble-bottom-center-text" class="size-5" />
           Prompts
+        </Backpex.HTML.Layout.sidebar_item>
+
+        <div class="divider my-2 text-xs text-base-content/50">API Usage</div>
+
+        <Backpex.HTML.Layout.sidebar_item
+          current_url={@current_url}
+          navigate={~p"/admin/usage/dashboard"}
+        >
+          <Backpex.HTML.CoreComponents.icon name="hero-chart-bar" class="size-5" /> Usage Dashboard
+        </Backpex.HTML.Layout.sidebar_item>
+        <Backpex.HTML.Layout.sidebar_item
+          current_url={@current_url}
+          navigate={~p"/admin/usage/alerts"}
+        >
+          <Backpex.HTML.CoreComponents.icon name="hero-bell-alert" class="size-5" /> Alerts
+        </Backpex.HTML.Layout.sidebar_item>
+        <Backpex.HTML.Layout.sidebar_item
+          current_url={@current_url}
+          navigate={~p"/admin/ai-providers"}
+        >
+          <Backpex.HTML.CoreComponents.icon name="hero-server" class="size-5" /> AI Providers
+        </Backpex.HTML.Layout.sidebar_item>
+        <Backpex.HTML.Layout.sidebar_item current_url={@current_url} navigate={~p"/admin/ai-models"}>
+          <Backpex.HTML.CoreComponents.icon name="hero-cpu-chip" class="size-5" /> AI Models
+        </Backpex.HTML.Layout.sidebar_item>
+        <Backpex.HTML.Layout.sidebar_item
+          current_url={@current_url}
+          navigate={~p"/admin/ai-model-prices"}
+        >
+          <Backpex.HTML.CoreComponents.icon name="hero-currency-dollar" class="size-5" /> Model Prices
+        </Backpex.HTML.Layout.sidebar_item>
+        <Backpex.HTML.Layout.sidebar_item
+          current_url={@current_url}
+          navigate={~p"/admin/alert-thresholds"}
+        >
+          <Backpex.HTML.CoreComponents.icon name="hero-adjustments-horizontal" class="size-5" />
+          Thresholds
         </Backpex.HTML.Layout.sidebar_item>
       </:sidebar>
       <Backpex.HTML.Layout.flash_messages flash={@flash} />

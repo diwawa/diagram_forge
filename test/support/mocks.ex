@@ -9,4 +9,9 @@ defmodule DiagramForge.Mocks do
   Mox.defmock(DiagramForge.MockAIClient,
     for: DiagramForge.AI.ClientBehaviour
   )
+
+  # Define mock for usage tracker (avoids DB connection issues in async tests)
+  Mox.defmock(DiagramForge.MockUsageTracker,
+    for: DiagramForge.Usage.TrackerBehaviour
+  )
 end

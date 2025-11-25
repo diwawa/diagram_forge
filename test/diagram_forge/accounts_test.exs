@@ -159,24 +159,7 @@ defmodule DiagramForge.AccountsTest do
   end
 
   describe "user_is_superadmin?/1" do
-    setup do
-      # Store original config
-      original_email = Application.get_env(:diagram_forge, :superadmin_email)
-
-      # Set test superadmin email
-      Application.put_env(:diagram_forge, :superadmin_email, "admin@example.com")
-
-      on_exit(fn ->
-        # Restore original config
-        if original_email do
-          Application.put_env(:diagram_forge, :superadmin_email, original_email)
-        else
-          Application.delete_env(:diagram_forge, :superadmin_email)
-        end
-      end)
-
-      :ok
-    end
+    # superadmin_email is configured in config/test.exs as "admin@example.com"
 
     test "returns true for superadmin user" do
       user = %User{email: "admin@example.com"}
@@ -192,11 +175,7 @@ defmodule DiagramForge.AccountsTest do
       assert Accounts.user_is_superadmin?(nil) == false
     end
 
-    test "returns false when superadmin_email is not configured" do
-      Application.delete_env(:diagram_forge, :superadmin_email)
-
-      user = %User{email: "any@example.com"}
-      assert Accounts.user_is_superadmin?(user) == false
-    end
+    # NOTE: The "not configured" test case is in accounts_superadmin_config_test.exs
+    # because it modifies global Application config and must run non-async
   end
 end

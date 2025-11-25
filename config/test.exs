@@ -44,10 +44,16 @@ config :phoenix_live_view,
 # Use MockAIClient in tests
 config :diagram_forge, :ai_client, DiagramForge.MockAIClient
 
+# Use MockUsageTracker in tests to avoid DB connection issues with async Tasks
+config :diagram_forge, :usage_tracker, DiagramForge.MockUsageTracker
+
 # Configure AI client for testing
 config :diagram_forge, DiagramForge.AI,
   api_key: "test_api_key",
   model: "gpt-4"
+
+# Default superadmin email for tests - prevents race conditions in async tests
+config :diagram_forge, :superadmin_email, "admin@example.com"
 
 # Configure Cloak for test environment with a static test key
 # This key is ONLY for testing and should never be used in production

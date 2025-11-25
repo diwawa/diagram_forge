@@ -75,6 +75,18 @@ defmodule DiagramForgeWeb.Router do
       # AI Prompts management (custom LiveView, not Backpex)
       live "/prompts", DiagramForgeWeb.Admin.PromptLive, :index
       live "/prompts/:key/edit", DiagramForgeWeb.Admin.PromptEditLive, :edit
+
+      # AI Provider/Model/Pricing management
+      live_resources("/ai-providers", DiagramForgeWeb.Admin.AIProviderResource)
+      live_resources("/ai-models", DiagramForgeWeb.Admin.AIModelResource)
+      live_resources("/ai-model-prices", DiagramForgeWeb.Admin.AIModelPriceResource)
+
+      # Usage alert threshold management
+      live_resources("/alert-thresholds", DiagramForgeWeb.Admin.AlertThresholdResource)
+
+      # Usage Dashboard and Alerts (custom LiveViews)
+      live "/usage/dashboard", DiagramForgeWeb.Admin.UsageDashboardLive, :index
+      live "/usage/alerts", DiagramForgeWeb.Admin.AlertHistoryLive, :index
     end
   end
 

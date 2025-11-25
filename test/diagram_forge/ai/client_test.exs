@@ -2,10 +2,16 @@ defmodule DiagramForge.AI.ClientTest do
   use ExUnit.Case, async: true
 
   import ExUnit.CaptureLog
+  import Mox
 
   alias DiagramForge.AI.Client
 
+  setup :verify_on_exit!
+
   setup do
+    # Stub the usage tracker to do nothing in these tests
+    stub(DiagramForge.MockUsageTracker, :track_usage, fn _model, _usage, _opts -> :ok end)
+
     bypass = Bypass.open()
     %{bypass: bypass, base_url: "http://localhost:#{bypass.port}"}
   end
