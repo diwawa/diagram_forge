@@ -846,6 +846,12 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
              |> put_flash(:error, "Failed to save fixed diagram")}
         end
 
+      {:unchanged, _source} ->
+        {:noreply,
+         socket
+         |> assign(:fixing_syntax, false)
+         |> put_flash(:warning, "AI couldn't identify syntax issues to fix")}
+
       {:error, reason} ->
         {:noreply,
          socket
@@ -869,6 +875,12 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
          |> assign(:selected_diagram, updated_diagram)
          |> assign(:generated_diagram, updated_diagram)
          |> put_flash(:info, "Syntax fixed! Review and save the diagram.")}
+
+      {:unchanged, _source} ->
+        {:noreply,
+         socket
+         |> assign(:fixing_syntax, false)
+         |> put_flash(:warning, "AI couldn't identify syntax issues to fix")}
 
       {:error, reason} ->
         {:noreply,

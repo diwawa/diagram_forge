@@ -444,10 +444,14 @@ defmodule DiagramForge.Diagrams do
 
       case json do
         %{"mermaid" => fixed_mermaid} when is_binary(fixed_mermaid) ->
-          # If the AI returned unchanged code and we have retries left, try again
-          if normalize_whitespace(fixed_mermaid) == normalize_whitespace(original_source) and
-               retries_left > 0 do
-            do_fix_diagram_syntax(original_source, summary, opts, retries_left - 1)
+          # If the AI returned unchanged code, retry or report unchanged
+          if normalize_whitespace(fixed_mermaid) == normalize_whitespace(original_source) do
+            if retries_left > 0 do
+              do_fix_diagram_syntax(original_source, summary, opts, retries_left - 1)
+            else
+              # All retries exhausted, AI couldn't fix it
+              {:unchanged, original_source}
+            end
           else
             {:ok, fixed_mermaid}
           end
