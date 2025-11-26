@@ -72,9 +72,10 @@ defmodule DiagramForge.AI.Prompts do
      WRONG: B[process(file)]  or  A[func(arg)]
      RIGHT: B["process(file)"]  or  B[process file]  or  A["func(arg)"]
 
-  2. CURLY BRACES {} - define shapes in Mermaid, NEVER unquoted in labels:
-     WRONG: -->|{:ok, pid}|
-     RIGHT: -->|"{:ok, pid}"|
+  2. EDGE LABELS WITH SPECIAL CHARS - MUST be quoted in Mermaid 11.x:
+     WRONG: -->|{:ok, pid}|  or  -->|[1,2,3]|  or  -->|func(arg)|
+     RIGHT: -->|"{:ok, pid}"|  or  -->|"[1,2,3]"|  or  -->|"func(arg)"|
+     ANY edge label containing { } [ ] ( ) MUST be wrapped in quotes: |"..."|
 
   3. DOTS in node labels - safer to quote:
      WRONG: A[File.open]  or  C[IO.puts]
@@ -106,7 +107,64 @@ defmodule DiagramForge.AI.Prompts do
      WRONG: A["it's here']  or  B['say "hello"']
      RIGHT: A["its here"]  or  B["say hello"]  or  A["it is here"]
 
-  APPROACH: Go through EACH node label [like this] and EACH edge label |like this| and fix any that contain ( ) { } . ! : | or quotes. Also verify all brackets match and arrows are valid syntax.
+  10. NO ESCAPED QUOTES - Mermaid CANNOT have \" or \' inside labels:
+      WRONG: A["say \"hello\""]  or  B["it\'s here"]  or  |"colors[\"red\"]"|
+      RIGHT: A["say hello"]  or  B["its here"]  or  |"colors red"|
+      CRITICAL: Remove ALL backslash escapes. Simplify text to avoid inner quotes entirely.
+      If a label needs quotes inside, REMOVE them or describe the content differently.
+
+  11. ESCAPED PARENTHESES - remove backslash escapes:
+      WRONG: A["File.open\\(file\\)"]  or  B["func\\(arg\\)"]
+      RIGHT: A["File.open(file)"]  or  B["func(arg)"]
+      Mermaid doesn't use backslash escapes - just quote the label properly
+
+  12. UNQUOTED @ SYMBOL - @ must be quoted in node labels:
+      WRONG: A[@spec]  or  B[@type]  or  C[@doc]
+      RIGHT: A["@spec"]  or  B["@type"]  or  C["@doc"]
+
+  13. UNCLOSED OR MISSING QUOTES - every quote must have a matching close:
+      WRONG: E["IO.puts 'End of macro]  or  F["some text]
+      RIGHT: E["IO.puts End of macro"]  or  F["some text"]
+      If a label has opening quotes, ensure closing quotes exist
+
+  14. TRUNCATED OR INCOMPLETE NODES - if a diagram ends mid-node, complete it:
+      WRONG: A[  (incomplete)  or  K["{  (truncated)
+      RIGHT: A["placeholder"]  or  remove the incomplete node entirely
+      If impossible to fix, remove the broken node/edge
+
+  15. NESTED QUOTES WITH SPECIAL CHARS - simplify labels with inner quotes AND colons:
+      WRONG: G["@color_map[\":hsb\"]"]  or  A["colors[\":red\"]"]
+      RIGHT: G["@color_map hsb"]  or  A["colors red"]
+      When quotes appear inside already-quoted labels, remove inner quotes and simplify
+
+  16. DOUBLE BRACKETS OR BRACES - remove duplicate closings:
+      WRONG: B["Result: [1, 2, 3"]]  or  I["result"}
+      RIGHT: B["Result: 1, 2, 3"]  or  I["result"]
+      A node cannot have ]] or "} - simplify content and use single closing
+
+  17. HTML ENTITIES FOR NESTED QUOTES - use &quot; for quotes inside node labels:
+      WRONG: F["Result: [{1, :a, \"cat\"}, {2, :b, \"dog\"}]"]
+      RIGHT: F["Result: [{1, :a, &quot;cat&quot;}, {2, :b, &quot;dog&quot;}]"]
+      When you MUST show quotes inside a quoted label, replace inner " with &quot;
+      This is the ONLY way to have quotes inside ["..."] labels in Mermaid.
+
+  18. ESCAPE SEQUENCES - replace \n, \t, \r with words:
+      WRONG: D["split(\"\n\")"]  or  D[split("\n")]
+      RIGHT: D["split by newline"]  or  D["split newline"]
+      Mermaid interprets \n as a line break. Use descriptive words instead.
+
+  19. STRING LITERALS IN FUNCTION CALLS - simplify instead of escaping:
+      WRONG: G["print_table([\"a\", \"b\", \"c\"])"]
+      RIGHT: G["print_table(headers)"]  or  G["print_table(columns)"]
+      When a label has a function call with string array arguments, replace the
+      array with a descriptive word like "headers", "items", "columns", etc.
+
+  20. UNRECOVERABLE TRUNCATED EDGES - remove completely:
+      WRONG: K -->|"[{  (incomplete edge with no target)
+      RIGHT: (remove the entire line)
+      If an edge has no target node or is clearly truncated mid-syntax, delete it.
+
+  APPROACH: Go through EACH node label [like this] and EACH edge label |like this| and fix any that contain ( ) { } . ! : | @ \ or quotes. Edge labels with special chars MUST be quoted. Verify all brackets match, arrows are valid, no escape sequences. For nested quotes, prefer simplification; if quotes are essential, use &quot; HTML entity. Remove unrecoverable truncated lines.
 
   Return ONLY valid JSON:
 
