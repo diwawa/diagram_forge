@@ -23,7 +23,7 @@ defmodule DiagramForge.UsageTest do
       # Expected: (1M * $1.00 / 1M) + (500K * $2.00 / 1M) = $1.00 + $1.00 = $2.00 = 200 cents
       cost_cents = Usage.calculate_cost(input_tokens, output_tokens, price)
 
-      assert cost_cents == 200
+      assert Decimal.equal?(cost_cents, Decimal.new("200.0000"))
     end
 
     test "calculate_cost/3 handles small token counts" do
@@ -40,11 +40,11 @@ defmodule DiagramForge.UsageTest do
       input_tokens = 1000
       output_tokens = 500
 
-      # Expected: (1000 * $3.00 / 1M) + (500 * $15.00 / 1M) = $0.003 + $0.0075 = $0.0105 = ~1 cent
+      # Expected: (1000 * $3.00 / 1M) + (500 * $15.00 / 1M) = $0.003 + $0.0075 = $0.0105 = 1.05 cents
       cost_cents = Usage.calculate_cost(input_tokens, output_tokens, price)
 
-      # Should round to 1 cent
-      assert cost_cents == 1
+      # Returns Decimal with 4 decimal places
+      assert Decimal.equal?(cost_cents, Decimal.new("1.0500"))
     end
 
     test "calculate_cost/3 handles zero tokens" do
@@ -60,7 +60,7 @@ defmodule DiagramForge.UsageTest do
 
       cost_cents = Usage.calculate_cost(0, 0, price)
 
-      assert cost_cents == 0
+      assert Decimal.equal?(cost_cents, Decimal.new("0.0000"))
     end
 
     test "calculate_cost/3 returns nil when price is nil" do
@@ -98,7 +98,7 @@ defmodule DiagramForge.UsageTest do
       assert token_usage.user_id == user.id
       assert token_usage.model_id == model.id
       # Cost should be calculated: (10K * $1 / 1M) + (5K * $2 / 1M) = $0.01 + $0.01 = 2 cents
-      assert token_usage.cost_cents == 2
+      assert Decimal.equal?(token_usage.cost_cents, Decimal.new("2.0000"))
 
       # Verify daily usage was aggregated
       daily =
@@ -107,7 +107,7 @@ defmodule DiagramForge.UsageTest do
       assert daily != nil
       assert daily.input_tokens == 10_000
       assert daily.output_tokens == 5_000
-      assert daily.cost_cents == 2
+      assert Decimal.equal?(daily.cost_cents, Decimal.new("2.0000"))
       assert daily.request_count == 1
     end
 
@@ -181,7 +181,7 @@ defmodule DiagramForge.UsageTest do
         input_tokens: 10_000,
         output_tokens: 5_000,
         total_tokens: 15_000,
-        cost_cents: 2,
+        cost_cents: Decimal.new("2.0000"),
         request_count: 5
       )
 
@@ -195,7 +195,7 @@ defmodule DiagramForge.UsageTest do
           input_tokens: 20_000,
           output_tokens: 10_000,
           total_tokens: 30_000,
-          cost_cents: 4,
+          cost_cents: Decimal.new("4.0000"),
           request_count: 10
         )
 
@@ -204,7 +204,7 @@ defmodule DiagramForge.UsageTest do
         assert summary.input_tokens == 30_000
         assert summary.output_tokens == 15_000
         # Cost calculated from tokens: 2 + 4 = 6 cents
-        assert summary.cost_cents == 6
+        assert Decimal.equal?(summary.cost_cents, Decimal.new("6.0000"))
         assert summary.request_count == 15
       else
         summary = Usage.get_monthly_summary(today.year, today.month)
@@ -212,7 +212,7 @@ defmodule DiagramForge.UsageTest do
         assert summary.input_tokens == 10_000
         assert summary.output_tokens == 5_000
         # Cost calculated from tokens: 2 cents
-        assert summary.cost_cents == 2
+        assert Decimal.equal?(summary.cost_cents, Decimal.new("2.0000"))
         assert summary.request_count == 5
       end
     end
@@ -222,7 +222,7 @@ defmodule DiagramForge.UsageTest do
 
       assert summary.input_tokens == 0
       assert summary.output_tokens == 0
-      assert summary.cost_cents == 0
+      assert Decimal.equal?(summary.cost_cents, Decimal.new("0"))
       assert summary.request_count == 0
     end
   end
@@ -251,7 +251,7 @@ defmodule DiagramForge.UsageTest do
         date: start_of_month,
         input_tokens: 100_000,
         output_tokens: 50_000,
-        cost_cents: 20,
+        cost_cents: Decimal.new("20.0000"),
         request_count: 5
       )
 
@@ -265,7 +265,7 @@ defmodule DiagramForge.UsageTest do
           date: second_day,
           input_tokens: 200_000,
           output_tokens: 100_000,
-          cost_cents: 40,
+          cost_cents: Decimal.new("40.0000"),
           request_count: 10
         )
       end
@@ -274,7 +274,7 @@ defmodule DiagramForge.UsageTest do
 
       # First day should have cost calculated from tokens
       first_day_cost = Enum.find(daily_costs, &(&1.date == start_of_month))
-      assert first_day_cost.cost_cents == 20
+      assert Decimal.equal?(first_day_cost.cost_cents, Decimal.new("20.0000"))
     end
   end
 
@@ -302,7 +302,7 @@ defmodule DiagramForge.UsageTest do
         date: today,
         input_tokens: 100_000,
         output_tokens: 50_000,
-        cost_cents: 20
+        cost_cents: Decimal.new("20.0000")
       )
 
       # User 2 has more cost: (500K * $1 / 1M) + (250K * $2 / 1M) = 100 cents
@@ -312,16 +312,16 @@ defmodule DiagramForge.UsageTest do
         date: today,
         input_tokens: 500_000,
         output_tokens: 250_000,
-        cost_cents: 100
+        cost_cents: Decimal.new("100.0000")
       )
 
       top_users = Usage.get_top_users_by_cost(today.year, today.month)
 
       assert length(top_users) == 2
       assert Enum.at(top_users, 0).user_id == user2.id
-      assert Enum.at(top_users, 0).cost_cents == 100
+      assert Decimal.equal?(Enum.at(top_users, 0).cost_cents, Decimal.new("100.0000"))
       assert Enum.at(top_users, 1).user_id == user1.id
-      assert Enum.at(top_users, 1).cost_cents == 20
+      assert Decimal.equal?(Enum.at(top_users, 1).cost_cents, Decimal.new("20.0000"))
     end
   end
 
@@ -352,14 +352,19 @@ defmodule DiagramForge.UsageTest do
         fixture(:alert_threshold, threshold_cents: 5000, period: "daily", scope: "total")
 
       # Create usage that exceeds threshold
-      fixture(:daily_aggregate, user: user, model: model, date: today, cost_cents: 6000)
+      fixture(:daily_aggregate,
+        user: user,
+        model: model,
+        date: today,
+        cost_cents: Decimal.new("6000.0000")
+      )
 
       alerts = Usage.check_all_thresholds()
 
       assert length(alerts) == 1
       alert = hd(alerts)
       assert alert.threshold_id == threshold.id
-      assert alert.amount_cents == 6000
+      assert Decimal.equal?(alert.amount_cents, Decimal.new("6000.0000"))
     end
 
     test "check_all_thresholds/0 does not create duplicate alerts" do
@@ -372,7 +377,12 @@ defmodule DiagramForge.UsageTest do
       _threshold =
         fixture(:alert_threshold, threshold_cents: 5000, period: "daily", scope: "total")
 
-      fixture(:daily_aggregate, user: user, model: model, date: today, cost_cents: 6000)
+      fixture(:daily_aggregate,
+        user: user,
+        model: model,
+        date: today,
+        cost_cents: Decimal.new("6000.0000")
+      )
 
       # First check creates alert
       alerts1 = Usage.check_all_thresholds()

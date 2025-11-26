@@ -14,7 +14,7 @@ defmodule DiagramForge.Usage.TokenUsage do
     field :input_tokens, :integer
     field :output_tokens, :integer
     field :total_tokens, :integer
-    field :cost_cents, :integer
+    field :cost_cents, :decimal
     field :metadata, :map, default: %{}
 
     belongs_to :user, DiagramForge.Accounts.User

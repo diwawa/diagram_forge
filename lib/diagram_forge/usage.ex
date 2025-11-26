@@ -102,10 +102,10 @@ defmodule DiagramForge.Usage do
       Decimal.mult(price.output_price_per_million, output_tokens)
       |> Decimal.div(1_000_000)
 
+    # Return cost in cents with 4 decimal places precision
     Decimal.add(input_cost, output_cost)
     |> Decimal.mult(100)
-    |> Decimal.round(0)
-    |> Decimal.to_integer()
+    |> Decimal.round(4)
   end
 
   def calculate_cost(_input_tokens, _output_tokens, nil), do: nil
@@ -168,6 +168,7 @@ defmodule DiagramForge.Usage do
 
   defp update_daily_aggregate(%TokenUsage{} = usage) do
     date = NaiveDateTime.to_date(usage.inserted_at)
+    cost = usage.cost_cents || Decimal.new(0)
 
     # Use upsert to atomically increment counters
     Repo.insert(
@@ -179,7 +180,7 @@ defmodule DiagramForge.Usage do
         input_tokens: usage.input_tokens,
         output_tokens: usage.output_tokens,
         total_tokens: usage.total_tokens,
-        cost_cents: usage.cost_cents || 0
+        cost_cents: cost
       },
       on_conflict: [
         inc: [
@@ -187,7 +188,7 @@ defmodule DiagramForge.Usage do
           input_tokens: usage.input_tokens,
           output_tokens: usage.output_tokens,
           total_tokens: usage.total_tokens,
-          cost_cents: usage.cost_cents || 0
+          cost_cents: cost
         ]
       ],
       conflict_target: [:user_id, :date, :model_id]
@@ -242,7 +243,7 @@ defmodule DiagramForge.Usage do
     # Sum up the calculated costs and token counts
     Enum.reduce(model_breakdown, initial_summary(), fn row, acc ->
       %{
-        cost_cents: acc.cost_cents + (row.cost_cents || 0),
+        cost_cents: Decimal.add(acc.cost_cents, row.cost_cents || Decimal.new(0)),
         request_count: acc.request_count + (row.request_count || 0),
         total_tokens: acc.total_tokens + (row.total_tokens || 0),
         input_tokens: acc.input_tokens + (row.input_tokens || 0),
@@ -252,7 +253,13 @@ defmodule DiagramForge.Usage do
   end
 
   defp initial_summary do
-    %{cost_cents: 0, request_count: 0, total_tokens: 0, input_tokens: 0, output_tokens: 0}
+    %{
+      cost_cents: Decimal.new(0),
+      request_count: 0,
+      total_tokens: 0,
+      input_tokens: 0,
+      output_tokens: 0
+    }
   end
 
   @doc """
@@ -292,13 +299,19 @@ defmodule DiagramForge.Usage do
     |> Enum.map(fn {user_id, rows} ->
       %{
         user_id: user_id,
-        cost_cents: Enum.sum(Enum.map(rows, & &1.cost_cents)),
+        cost_cents: sum_decimals(Enum.map(rows, & &1.cost_cents)),
         request_count: Enum.sum(Enum.map(rows, & &1.request_count)),
         total_tokens: Enum.sum(Enum.map(rows, & &1.total_tokens))
       }
     end)
-    |> Enum.sort_by(& &1.cost_cents, :desc)
+    |> Enum.sort_by(& &1.cost_cents, &(Decimal.compare(&1, &2) == :gt))
     |> Enum.take(limit)
+  end
+
+  defp sum_decimals(decimals) do
+    Enum.reduce(decimals, Decimal.new(0), fn val, acc ->
+      Decimal.add(acc, val || Decimal.new(0))
+    end)
   end
 
   @doc """
@@ -339,7 +352,7 @@ defmodule DiagramForge.Usage do
         {date,
          %{
            date: date,
-           cost_cents: Enum.sum(Enum.map(rows, & &1.cost_cents)),
+           cost_cents: sum_decimals(Enum.map(rows, & &1.cost_cents)),
            request_count: Enum.sum(Enum.map(rows, & &1.request_count))
          }}
       end)
@@ -347,7 +360,7 @@ defmodule DiagramForge.Usage do
     # Generate all dates in range and merge with actual data
     Date.range(start_date, end_date)
     |> Enum.map(fn date ->
-      Map.get(daily_data, date, %{date: date, cost_cents: 0, request_count: 0})
+      Map.get(daily_data, date, %{date: date, cost_cents: Decimal.new(0), request_count: 0})
     end)
   end
 
@@ -472,11 +485,24 @@ defmodule DiagramForge.Usage do
   @doc """
   Formats cents as dollars string.
   """
+  def format_cents(%Decimal{} = cents) do
+    dollars = Decimal.div(cents, 100)
+    # Use 4 decimal places for small amounts, 2 for larger amounts
+    decimals = if Decimal.lt?(dollars, Decimal.new("0.01")), do: 4, else: 2
+    Decimal.round(dollars, decimals) |> Decimal.to_string()
+  end
+
   def format_cents(cents) when is_integer(cents) do
     dollars = cents / 100
     :erlang.float_to_binary(dollars, decimals: 2)
   end
 
+  def format_cents(cents) when is_float(cents) do
+    dollars = cents / 100
+    :erlang.float_to_binary(dollars, decimals: 2)
+  end
+
+  def format_cents(nil), do: "0.00"
   def format_cents(_), do: "0.00"
 
   # ============================================================================
@@ -567,7 +593,8 @@ defmodule DiagramForge.Usage do
 
   defp check_total_threshold(threshold, start_date, end_date) do
     total_cost = get_total_cost_for_period(start_date, end_date)
-    threshold_exceeded = total_cost >= threshold.threshold_cents
+    threshold_decimal = Decimal.new(threshold.threshold_cents)
+    threshold_exceeded = Decimal.compare(total_cost, threshold_decimal) != :lt
     alert_already_exists = alert_exists?(threshold.id, nil, start_date, end_date)
 
     if threshold_exceeded and not alert_already_exists do
@@ -626,7 +653,7 @@ defmodule DiagramForge.Usage do
   defp get_total_cost_for_period(start_date, end_date) do
     DailyAggregate
     |> where([d], d.date >= ^start_date and d.date <= ^end_date)
-    |> Repo.aggregate(:sum, :cost_cents) || 0
+    |> Repo.aggregate(:sum, :cost_cents) || Decimal.new(0)
   end
 
   defp get_users_over_threshold(threshold_cents, start_date, end_date) do

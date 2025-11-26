@@ -498,7 +498,7 @@ defmodule DiagramForgeWeb.Admin.UsageDashboardLive do
 
     max_daily_cost =
       daily_costs
-      |> Enum.map(& &1.cost_cents)
+      |> Enum.map(&to_number(&1.cost_cents))
       |> Enum.max(fn -> 0 end)
 
     socket
@@ -566,7 +566,14 @@ defmodule DiagramForgeWeb.Admin.UsageDashboardLive do
   defp bar_height(nil, _max), do: 4
 
   defp bar_height(cost, max) do
-    min(max(round(cost / max * 160), 4), 160)
+    cost_num = to_number(cost)
+    max_num = to_number(max)
+
+    if max_num == 0 do
+      4
+    else
+      min(max(round(cost_num / max_num * 160), 4), 160)
+    end
   end
 
   # Generate Y axis ticks for the daily cost chart
@@ -574,22 +581,31 @@ defmodule DiagramForgeWeb.Admin.UsageDashboardLive do
   defp y_axis_ticks(0), do: [{0, 0}]
 
   defp y_axis_ticks(max_cents) do
-    # Determine nice tick intervals based on max value
-    tick_count = 4
-    raw_interval = max_cents / tick_count
+    max_num = to_number(max_cents)
+    build_y_axis_ticks(max_num)
+  end
 
-    # Round to nice intervals (1, 2, 5, 10, 20, 50, 100, etc.)
+  defp build_y_axis_ticks(0), do: [{0, 0}]
+
+  defp build_y_axis_ticks(max_num) when max_num == 0, do: [{0, 0}]
+
+  defp build_y_axis_ticks(max_num) do
+    tick_count = 4
+    raw_interval = max_num / tick_count
     nice_interval = nice_tick_interval(raw_interval)
 
-    # Generate tick values from 0 to max
     0
     |> Stream.iterate(&(&1 + nice_interval))
-    |> Enum.take_while(&(&1 <= max_cents + nice_interval))
-    |> Enum.map(fn cents ->
-      position = if max_cents > 0, do: round(cents / max_cents * 160), else: 0
-      {cents, min(position, 160)}
-    end)
+    |> Enum.take_while(&(&1 <= max_num + nice_interval))
+    |> Enum.map(&tick_tuple(&1, max_num))
   end
+
+  defp tick_tuple(cents, max_num) when max_num > 0 do
+    position = round(cents / max_num * 160)
+    {cents, min(position, 160)}
+  end
+
+  defp tick_tuple(cents, _max_num), do: {cents, 0}
 
   defp nice_tick_interval(raw) when raw <= 1, do: 1
   defp nice_tick_interval(raw) when raw <= 2, do: 2
@@ -608,4 +624,9 @@ defmodule DiagramForgeWeb.Admin.UsageDashboardLive do
       user -> user.email
     end
   end
+
+  # Convert Decimal or other numeric types to a number for arithmetic
+  defp to_number(%Decimal{} = d), do: Decimal.to_float(d)
+  defp to_number(nil), do: 0
+  defp to_number(n) when is_number(n), do: n
 end

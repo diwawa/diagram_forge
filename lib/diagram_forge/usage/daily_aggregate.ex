@@ -16,7 +16,7 @@ defmodule DiagramForge.Usage.DailyAggregate do
     field :input_tokens, :integer, default: 0
     field :output_tokens, :integer, default: 0
     field :total_tokens, :integer, default: 0
-    field :cost_cents, :integer, default: 0
+    field :cost_cents, :decimal, default: 0
 
     belongs_to :user, DiagramForge.Accounts.User
     belongs_to :model, DiagramForge.Usage.AIModel

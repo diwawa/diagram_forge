@@ -12,7 +12,7 @@ defmodule DiagramForge.Repo.Migrations.CreateUsageAlerts do
       add :user_id, references(:users, type: :binary_id, on_delete: :delete_all)
       add :period_start, :date, null: false
       add :period_end, :date, null: false
-      add :amount_cents, :integer, null: false
+      add :amount_cents, :decimal, precision: 12, scale: 4, null: false
       add :email_sent_at, :utc_datetime
       add :acknowledged_at, :utc_datetime
       add :acknowledged_by_id, references(:users, type: :binary_id, on_delete: :nilify_all)

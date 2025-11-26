@@ -11,7 +11,7 @@ defmodule DiagramForge.Repo.Migrations.CreateUsageDailyAggregates do
       add :input_tokens, :integer, default: 0, null: false
       add :output_tokens, :integer, default: 0, null: false
       add :total_tokens, :integer, default: 0, null: false
-      add :cost_cents, :integer, default: 0, null: false
+      add :cost_cents, :decimal, precision: 12, scale: 4, default: 0, null: false
 
       timestamps()
     end

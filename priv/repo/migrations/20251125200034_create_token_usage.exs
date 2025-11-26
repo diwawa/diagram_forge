@@ -10,7 +10,7 @@ defmodule DiagramForge.Repo.Migrations.CreateTokenUsage do
       add :input_tokens, :integer, null: false
       add :output_tokens, :integer, null: false
       add :total_tokens, :integer, null: false
-      add :cost_cents, :integer
+      add :cost_cents, :decimal, precision: 12, scale: 4
       add :metadata, :map, default: %{}
 
       timestamps(updated_at: false)

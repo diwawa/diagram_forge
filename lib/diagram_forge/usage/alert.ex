@@ -13,7 +13,7 @@ defmodule DiagramForge.Usage.Alert do
   schema "usage_alerts" do
     field :period_start, :date
     field :period_end, :date
-    field :amount_cents, :integer
+    field :amount_cents, :decimal
     field :email_sent_at, :utc_datetime
     field :acknowledged_at, :utc_datetime
 

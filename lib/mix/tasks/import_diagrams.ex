@@ -88,10 +88,12 @@ defmodule Mix.Tasks.Import.Diagrams do
 
         diagram_attrs = %{
           title: title,
-          description: diagram_data["description"],
-          source: diagram_data["source"],
+          summary: diagram_data["summary"],
+          notes_md: diagram_data["notes_md"],
+          diagram_source: diagram_data["diagram_source"],
           tags: diagram_data["tags"] || [],
           visibility: diagram_data["visibility"] || "private",
+          format: diagram_data["format"] || "mermaid",
           document_id: document && document.id
         }
 
