@@ -7,19 +7,10 @@ defmodule DiagramForge.AI do
   is used instead.
   """
 
+  alias DiagramForge.AI.CacheServer
   alias DiagramForge.AI.Prompt
   alias DiagramForge.AI.Prompts
   alias DiagramForge.Repo
-
-  # Cache table name
-  @cache_table :prompt_cache
-
-  @doc """
-  Starts the ETS cache for prompts. Called from Application.start/2.
-  """
-  def start_cache do
-    :ets.new(@cache_table, [:named_table, :public, read_concurrency: true])
-  end
 
   @doc """
   Gets a prompt by key, checking cache first, then DB, then falling back to defaults.
@@ -27,9 +18,9 @@ defmodule DiagramForge.AI do
   def get_prompt(key) when is_atom(key), do: get_prompt(Atom.to_string(key))
 
   def get_prompt(key) when is_binary(key) do
-    case :ets.lookup(@cache_table, key) do
-      [{^key, content}] -> content
-      [] -> fetch_and_cache(key)
+    case CacheServer.get(key) do
+      {:ok, content} -> content
+      :miss -> fetch_and_cache(key)
     end
   end
 
@@ -40,7 +31,7 @@ defmodule DiagramForge.AI do
         nil -> default_prompt(key)
       end
 
-    :ets.insert(@cache_table, {key, content})
+    CacheServer.put(key, content)
     content
   end
 
@@ -48,7 +39,7 @@ defmodule DiagramForge.AI do
   Invalidates the cache for a specific prompt key.
   """
   def invalidate_cache(key) when is_binary(key) do
-    :ets.delete(@cache_table, key)
+    CacheServer.delete(key)
   end
 
   def invalidate_cache(key) when is_atom(key) do
@@ -59,7 +50,7 @@ defmodule DiagramForge.AI do
   Invalidates all cached prompts.
   """
   def invalidate_all_cache do
-    :ets.delete_all_objects(@cache_table)
+    CacheServer.delete_all()
   end
 
   # Default prompts (fallback) - calls the default functions to avoid circular deps

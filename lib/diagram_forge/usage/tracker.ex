@@ -24,10 +24,13 @@ defmodule DiagramForge.Usage.Tracker do
 
   @impl true
   def track_usage(model_api_name, usage, opts) do
-    # Track usage asynchronously to avoid blocking the response
-    Task.start(fn ->
-      do_track_usage(model_api_name, usage, opts)
-    end)
+    # Track usage asynchronously via supervised task
+    # Using Task.Supervisor ensures crashes are logged and visible
+    Task.Supervisor.start_child(
+      DiagramForge.TaskSupervisor,
+      fn -> do_track_usage(model_api_name, usage, opts) end,
+      restart: :temporary
+    )
 
     :ok
   end

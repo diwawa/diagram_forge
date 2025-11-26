@@ -218,14 +218,14 @@ end
 
 ## Implementation Checklist
 
-- [ ] Add `Task.Supervisor` to application.ex
-- [ ] Update `Usage.Tracker` to use `Task.Supervisor.start_child/3`
-- [ ] Create `DiagramForge.AI.CacheServer` GenServer
-- [ ] Add CacheServer to supervision tree
-- [ ] Remove manual `start_cache()` call from application.ex
-- [ ] Update any direct ETS calls if needed
+- [x] Add `Task.Supervisor` to application.ex
+- [x] Update `Usage.Tracker` to use `Task.Supervisor.start_child/3`
+- [x] Create `DiagramForge.AI.CacheServer` GenServer
+- [x] Add CacheServer to supervision tree
+- [x] Remove manual `start_cache()` call from application.ex
+- [x] Update any direct ETS calls if needed
 - [ ] Add tests for crash isolation scenarios
-- [ ] Run full test suite to verify no regressions
+- [x] Run full test suite to verify no regressions
 
 ---
 

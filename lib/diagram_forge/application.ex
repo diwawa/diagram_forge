@@ -7,13 +7,14 @@ defmodule DiagramForge.Application do
 
   @impl true
   def start(_type, _args) do
-    # Start ETS cache for configurable prompts
-    DiagramForge.AI.start_cache()
-
     children = [
       DiagramForgeWeb.Telemetry,
       DiagramForge.Repo,
       DiagramForge.Vault,
+      # Task supervisor for fire-and-forget tasks (e.g., usage tracking)
+      {Task.Supervisor, name: DiagramForge.TaskSupervisor},
+      # ETS cache for configurable prompts (supervised)
+      DiagramForge.AI.CacheServer,
       {Oban, Application.fetch_env!(:diagram_forge, Oban)},
       {DNSCluster, query: Application.get_env(:diagram_forge, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: DiagramForge.PubSub},
