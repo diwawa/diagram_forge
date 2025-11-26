@@ -33,23 +33,38 @@ defmodule DiagramForge.AI.Prompts do
   - Prefer 'flowchart' or 'sequenceDiagram' unless another type is clearly better.
   - Use concise labels, avoid sentences on nodes.
 
-  CRITICAL Mermaid syntax rules - ALWAYS quote labels with special characters:
+  CRITICAL Mermaid 11.x syntax rules:
 
-  Node labels with ANY of these MUST be quoted with double quotes:
+  NODE LABELS - Quote with double quotes if they contain special chars:
   - Parentheses: A["process(file)"] not A[process(file)]
   - Dots: A["File.open"] not A[File.open]
-  - Exclamation marks: A["File.open!"] not A[File.open!]
+  - Exclamation: A["File.open!"] not A[File.open!]
   - Colons: A["key: value"] not A[key: value]
-  - Curly braces: NEVER use {} in node labels, they define shapes
+  - @ symbol: A["@spec"] not A[@spec]
+  - Curly braces: NEVER use {} unquoted, they define shapes
 
-  Edge labels with special chars MUST be quoted:
+  EDGE LABELS - MUST be quoted if they contain { } [ ] ( ):
   - -->|"{:ok, pid}"| not -->|{:ok, pid}|
-  - -->|"error: msg"| not -->|error: msg|
+  - -->|"[1,2,3]"| not -->|[1,2,3]|
+  - -->|"func(arg)"| not -->|func(arg)|
 
-  AVOID nested quotes - simplify instead:
-  - A[raise error] not A[raise "error"]
+  NEVER USE ESCAPE SEQUENCES:
+  - NO backslash escapes: Never use \" or \' or \n inside labels
+  - WRONG: A["say \"hello\""] or D["split(\"\n\")"]
+  - RIGHT: A["say hello"] or D["split by newline"]
 
-  When in doubt, QUOTE the label or simplify the text.
+  NESTED QUOTES - Two options:
+  1. SIMPLIFY (preferred): Remove inner quotes entirely
+     - A["print_table(headers)"] not A["print_table([\"a\", \"b\"])"]
+  2. HTML ENTITY (when quotes essential): Use &quot;
+     - F["Result: &quot;cat&quot;"] for quotes inside labels
+
+  BRACKETS MUST MATCH:
+  - Every [ needs ], every " needs ", every { needs }
+  - WRONG: B["Result: [1,2,3"]] or I["text"}
+  - RIGHT: B["Result: [1,2,3]"] or I["text"]
+
+  When in doubt: QUOTE the label AND SIMPLIFY the content.
 
   Only output strictly valid JSON with the requested fields.
   """
