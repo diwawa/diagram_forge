@@ -340,14 +340,6 @@ defmodule DiagramForge.UsageTest do
   end
 
   describe "alert threshold checking" do
-    alias DiagramForge.Usage.AlertThreshold
-
-    setup do
-      # Clear any seeded thresholds to isolate tests
-      Repo.delete_all(AlertThreshold)
-      :ok
-    end
-
     test "check_all_thresholds/0 creates alerts when thresholds exceeded" do
       provider = fixture(:ai_provider)
       model = fixture(:ai_model, provider: provider)

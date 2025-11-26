@@ -39,3 +39,7 @@ npm-debug.log
 .DS_Store
 
 logs/
+
+# Diagram export files
+diagrams.json
+**/diagrams.json
