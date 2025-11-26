@@ -93,6 +93,7 @@ defmodule DiagramForge.MixProject do
     [
       setup: ["deps.get", "ecto.create", "ecto.migrate", "assets.setup", "assets.build"],
       "ecto.reset": ["ecto.drop", "ecto.create", "ecto.migrate"],
+      "seed.configs": ["run priv/repo/seeds.exs"],
       "seed.diagrams": ["run priv/repo/seed_diagrams.exs"],
       "seed.usage": ["run priv/repo/seed_usage.exs"],
       test: ["ecto.create --quiet", "ecto.migrate --quiet", "test"],

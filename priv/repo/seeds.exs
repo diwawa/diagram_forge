@@ -11,7 +11,62 @@
 # and so on) as they will fail if something goes wrong.
 
 alias DiagramForge.Repo
+alias DiagramForge.Accounts.User
 alias DiagramForge.Usage.{AIProvider, AIModel, AIModelPrice, AlertThreshold}
+
+# ============================================================================
+# Superadmin User (from DF_SUPERADMIN_USER env var)
+# ============================================================================
+
+superadmin_email = System.get_env("DF_SUPERADMIN_USER")
+
+if superadmin_email && superadmin_email != "" do
+  superadmin =
+    case Repo.get_by(User, email: superadmin_email) do
+      nil ->
+        %User{}
+        |> User.changeset(%{
+          email: superadmin_email,
+          name: "Admin",
+          provider: "github",
+          provider_uid: "admin_#{:erlang.phash2(superadmin_email)}",
+          provider_token: "admin_token_placeholder",
+          show_public_diagrams: true
+        })
+        |> Repo.insert!()
+
+      existing ->
+        existing
+    end
+
+  IO.puts("✓ Superadmin user: #{superadmin.email} (#{superadmin.id})")
+else
+  IO.puts("⚠ DF_SUPERADMIN_USER not set - skipping superadmin creation")
+end
+
+# ============================================================================
+# Seed User (for testing/development)
+# ============================================================================
+
+seed_user =
+  case Repo.get_by(User, email: "seed@example.com") do
+    nil ->
+      %User{}
+      |> User.changeset(%{
+        email: "seed@example.com",
+        name: "Seed User",
+        provider: "github",
+        provider_uid: "seed_user_12345",
+        provider_token: "seed_token",
+        show_public_diagrams: true
+      })
+      |> Repo.insert!()
+
+    existing ->
+      existing
+  end
+
+IO.puts("✓ Seed user: #{seed_user.id}")
 
 # ============================================================================
 # AI Providers and Models

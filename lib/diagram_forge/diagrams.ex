@@ -313,29 +313,70 @@ defmodule DiagramForge.Diagrams do
   def create_diagram_for_user(attrs, user_id) do
     result =
       Repo.transaction(fn ->
-        diagram_changeset = Diagram.changeset(%Diagram{}, attrs)
-
-        case Repo.insert(diagram_changeset) do
-          {:ok, diagram} ->
-            create_user_diagram_entry(diagram, user_id)
-
-          {:error, changeset} ->
-            Repo.rollback(changeset)
-        end
+        attrs
+        |> insert_diagram_with_slug_retry()
+        |> handle_diagram_insert(attrs, user_id)
       end)
 
-    case result do
+    broadcast_if_created(result)
+  end
+
+  defp insert_diagram_with_slug_retry(attrs) do
+    diagram_changeset = Diagram.changeset(%Diagram{}, attrs)
+    Repo.insert(diagram_changeset)
+  end
+
+  defp handle_diagram_insert({:ok, diagram}, _attrs, user_id) do
+    create_user_diagram_entry(diagram, user_id)
+  end
+
+  defp handle_diagram_insert(
+         {:error, %Ecto.Changeset{errors: errors} = changeset},
+         attrs,
+         user_id
+       ) do
+    if slug_taken?(errors) do
+      retry_with_unique_slug(attrs, user_id)
+    else
+      Repo.rollback(changeset)
+    end
+  end
+
+  defp broadcast_if_created({:ok, diagram}) do
+    Phoenix.PubSub.broadcast(
+      DiagramForge.PubSub,
+      "diagrams",
+      {:diagram_created, diagram.id}
+    )
+
+    {:ok, diagram}
+  end
+
+  defp broadcast_if_created(error), do: error
+
+  defp slug_taken?(errors) do
+    Enum.any?(errors, fn
+      {:slug, {_, opts}} when is_list(opts) ->
+        Keyword.get(opts, :constraint) == :unique
+
+      _ ->
+        false
+    end)
+  end
+
+  defp retry_with_unique_slug(attrs, user_id) do
+    original_slug = attrs[:slug] || attrs["slug"]
+    unique_slug = generate_unique_slug(original_slug)
+    updated_attrs = Map.put(attrs, :slug, unique_slug)
+
+    diagram_changeset = Diagram.changeset(%Diagram{}, updated_attrs)
+
+    case Repo.insert(diagram_changeset) do
       {:ok, diagram} ->
-        Phoenix.PubSub.broadcast(
-          DiagramForge.PubSub,
-          "diagrams",
-          {:diagram_created, diagram.id}
-        )
+        create_user_diagram_entry(diagram, user_id)
 
-        {:ok, diagram}
-
-      error ->
-        error
+      {:error, changeset} ->
+        Repo.rollback(changeset)
     end
   end
 

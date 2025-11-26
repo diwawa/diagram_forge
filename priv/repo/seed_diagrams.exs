@@ -7,30 +7,36 @@ alias DiagramForge.Accounts.User
 alias DiagramForge.Diagrams
 alias DiagramForge.Diagrams.{Document, Diagram, UserDiagram, SavedFilter}
 
-# Clear existing data in correct order (respecting foreign keys)
-IO.puts("Clearing existing data...")
+# Clear existing diagram data in correct order (respecting foreign keys)
+# Note: We preserve the seed user if they already exist
+IO.puts("Clearing existing diagram data...")
 Repo.delete_all(UserDiagram)
 Repo.delete_all(SavedFilter)
 Repo.delete_all(Diagram)
 Repo.delete_all(Document)
-Repo.delete_all(User)
 
-# Create a seed user for diagram ownership
-IO.puts("Creating seed user...")
+# Get or create the seed user for diagram ownership
+IO.puts("Getting or creating seed user...")
 
 seed_user =
-  %User{}
-  |> User.changeset(%{
-    email: "seed@example.com",
-    name: "Seed User",
-    provider: "github",
-    provider_uid: "seed_user_12345",
-    provider_token: "seed_token",
-    show_public_diagrams: true
-  })
-  |> Repo.insert!()
+  case Repo.get_by(User, email: "seed@example.com") do
+    nil ->
+      %User{}
+      |> User.changeset(%{
+        email: "seed@example.com",
+        name: "Seed User",
+        provider: "github",
+        provider_uid: "seed_user_12345",
+        provider_token: "seed_token",
+        show_public_diagrams: true
+      })
+      |> Repo.insert!()
 
-IO.puts("Seed user created with ID: #{seed_user.id}")
+    existing ->
+      existing
+  end
+
+IO.puts("Using seed user with ID: #{seed_user.id}")
 
 # Create a seed document (owned by seed user)
 IO.puts("Creating seed document...")
