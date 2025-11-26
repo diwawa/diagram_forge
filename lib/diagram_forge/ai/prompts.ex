@@ -92,7 +92,21 @@ defmodule DiagramForge.AI.Prompts do
      WRONG: A[key: value]
      RIGHT: A["key: value"]
 
-  APPROACH: Go through EACH node label [like this] and EACH edge label |like this| and fix any that contain ( ) { } . ! : | or quotes.
+  7. MISMATCHED BRACKETS - opening and closing must match:
+     WRONG: A["label']  or  B["text}  or  C['value"]
+     RIGHT: A["label"]  or  B["text"]  or  C["value"]
+     Check that [ matches ], " matches ", ' matches '
+
+  8. INVALID ARROW SYNTAX - use only valid Mermaid arrows:
+     WRONG: A -->> B  or  A ==> B  or  A ~~> B
+     RIGHT: A --> B  or  A ---> B  or  A -.-> B  or  A ==> B (subgraph only)
+     Valid arrows: -->, --->, -.->, -.-, ==>, <-->, ---|text|
+
+  9. MIXED QUOTE TYPES - don't mix " and ' in the same label:
+     WRONG: A["it's here']  or  B['say "hello"']
+     RIGHT: A["its here"]  or  B["say hello"]  or  A["it is here"]
+
+  APPROACH: Go through EACH node label [like this] and EACH edge label |like this| and fix any that contain ( ) { } . ! : | or quotes. Also verify all brackets match and arrows are valid syntax.
 
   Return ONLY valid JSON:
 
