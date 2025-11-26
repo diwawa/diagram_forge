@@ -56,6 +56,7 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
       |> assign(:uploading, false)
       |> assign(:fixing_syntax, false)
       |> assign(:diagram_theme, "dark")
+      |> assign(:mermaid_error, nil)
       |> assign(:show_save_filter_modal, false)
       |> assign(:editing_filter, nil)
       |> assign(:editing_diagram, nil)
@@ -489,6 +490,24 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
     end
   end
 
+  # Mermaid render error/success events from JS hook
+  @impl true
+  def handle_event("mermaid_render_error", params, socket) do
+    error_info = %{
+      message: params["message"],
+      line: params["line"],
+      expected: params["expected"],
+      mermaid_version: params["mermaidVersion"]
+    }
+
+    {:noreply, assign(socket, :mermaid_error, error_info)}
+  end
+
+  @impl true
+  def handle_event("mermaid_render_success", _params, socket) do
+    {:noreply, assign(socket, :mermaid_error, nil)}
+  end
+
   @impl true
   def handle_event("change_visibility", %{"id" => id, "visibility" => visibility}, socket) do
     diagram = Diagrams.get_diagram!(id)
@@ -827,7 +846,8 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
   @impl true
   def handle_info({:do_fix_syntax, diagram}, socket) do
     user_id = socket.assigns.current_user.id
-    opts = build_ai_opts(user_id)
+    mermaid_error = socket.assigns.mermaid_error
+    opts = build_ai_opts(user_id) ++ [mermaid_error: mermaid_error]
 
     case Diagrams.fix_diagram_syntax(diagram, opts) do
       {:ok, fixed_source} ->
@@ -863,7 +883,8 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
   @impl true
   def handle_info({:do_fix_generated_syntax, diagram}, socket) do
     user_id = socket.assigns.current_user && socket.assigns.current_user.id
-    opts = build_ai_opts(user_id)
+    mermaid_error = socket.assigns.mermaid_error
+    opts = build_ai_opts(user_id) ++ [mermaid_error: mermaid_error]
 
     case Diagrams.fix_diagram_syntax_source(diagram.diagram_source, diagram.summary, opts) do
       {:ok, fixed_source} ->

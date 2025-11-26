@@ -431,7 +431,8 @@ defmodule DiagramForge.Diagrams do
     # Validate options early - fail fast if user_id missing with tracking enabled
     ai_opts = build_ai_opts!(opts, "syntax_fix")
     ai_client = opts[:ai_client] || Application.get_env(:diagram_forge, :ai_client, Client)
-    user_prompt = Prompts.fix_mermaid_syntax_prompt(original_source, summary)
+    mermaid_error = opts[:mermaid_error]
+    user_prompt = Prompts.fix_mermaid_syntax_prompt(original_source, summary, mermaid_error)
 
     try do
       json =

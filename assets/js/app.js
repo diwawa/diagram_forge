@@ -46,28 +46,53 @@ const Mermaid = {
   updated() {
     this.renderDiagram()
   },
-  renderDiagram() {
-    const diagram = this.el.querySelector(".mermaid")
-    if (diagram) {
-      // Get theme from data attribute
-      const theme = this.el.dataset.theme || "light"
-      const mermaidTheme = theme === "dark" ? "dark" : "default"
+  async renderDiagram() {
+    const container = this.el.querySelector(".mermaid")
+    if (!container) return
 
-      // Reinitialize Mermaid with the selected theme
-      mermaid.initialize({
-        startOnLoad: false,
-        theme: mermaidTheme,
-        securityLevel: "loose"
-      })
+    const diagramCode = this.el.dataset.diagram
+    if (!diagramCode) return
 
-      // Clear previous diagram
-      diagram.removeAttribute("data-processed")
-      diagram.innerHTML = this.el.dataset.diagram
+    // Get theme from data attribute
+    const theme = this.el.dataset.theme || "light"
+    const mermaidTheme = theme === "dark" ? "dark" : "default"
 
-      // Render with new theme
-      mermaid.run({
-        querySelector: ".mermaid"
-      })
+    // Reinitialize Mermaid with the selected theme
+    mermaid.initialize({
+      startOnLoad: false,
+      theme: mermaidTheme,
+      securityLevel: "loose"
+    })
+
+    // Generate unique ID for this render
+    const diagramId = `mermaid-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+
+    try {
+      const { svg } = await mermaid.render(diagramId, diagramCode)
+      container.innerHTML = svg
+      // Clear any previous error state
+      this.pushEvent("mermaid_render_success", {})
+    } catch (err) {
+      // Extract useful error information
+      const errorInfo = {
+        message: err.message || String(err),
+        // Mermaid includes hash with parsing details
+        line: err.hash?.line,
+        expected: err.hash?.expected ? err.hash.expected.join(", ") : null,
+        // Get the mermaid version for context
+        mermaidVersion: mermaid.version || "unknown"
+      }
+
+      // Send error to server for AI context
+      this.pushEvent("mermaid_render_error", errorInfo)
+
+      // Display error in container
+      container.innerHTML = `
+        <div class="text-red-400 p-4 border border-red-700 rounded bg-red-950/50">
+          <p class="font-bold text-sm mb-2">Syntax Error</p>
+          <p class="text-xs font-mono break-all">${err.message || "Unknown error"}</p>
+        </div>
+      `
     }
   }
 }

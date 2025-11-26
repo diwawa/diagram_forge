@@ -20,8 +20,12 @@ defmodule DiagramForge.AI.Prompts do
   Only output strictly valid JSON. Do not include any explanation outside the JSON object.
   """
 
+  # Mermaid version from package.json (used in prompts for version-specific syntax)
+  @mermaid_version "11.12.1"
+
   @diagram_system_prompt """
   You generate small, interview-friendly technical diagrams in Mermaid syntax.
+  Target Mermaid version: #{@mermaid_version}
 
   Constraints:
   - The diagram must fit on a single screen and stay readable.
@@ -50,7 +54,7 @@ defmodule DiagramForge.AI.Prompts do
   Only output strictly valid JSON with the requested fields.
   """
 
-  # Template uses {{MERMAID_CODE}} and {{SUMMARY}} placeholders for interpolation
+  # Template uses {{MERMAID_CODE}}, {{SUMMARY}}, and {{ERROR_CONTEXT}} placeholders
   @fix_mermaid_syntax_prompt """
   The following Mermaid diagram has a syntax error and won't render:
 
@@ -60,6 +64,7 @@ defmodule DiagramForge.AI.Prompts do
 
   Context about what this diagram should show:
   {{SUMMARY}}
+  {{ERROR_CONTEXT}}
 
   SCAN EVERY NODE AND EDGE LABEL for these issues:
 
@@ -114,7 +119,7 @@ defmodule DiagramForge.AI.Prompts do
 
   @doc """
   Returns the default template for fixing Mermaid syntax errors.
-  Uses {{MERMAID_CODE}} and {{SUMMARY}} placeholders.
+  Uses {{MERMAID_CODE}}, {{SUMMARY}}, and {{ERROR_CONTEXT}} placeholders.
   Used as fallback when no DB customization exists.
   """
   def default_fix_mermaid_syntax_prompt, do: @fix_mermaid_syntax_prompt
@@ -268,13 +273,37 @@ defmodule DiagramForge.AI.Prompts do
   @doc """
   Returns the user prompt for fixing Mermaid syntax errors.
 
-  Takes the broken Mermaid code, the diagram's summary/context, and attempts to fix it.
-  Checks database for customized template first, falls back to default.
-  Template uses {{MERMAID_CODE}} and {{SUMMARY}} placeholders.
+  Takes the broken Mermaid code, the diagram's summary/context, and optionally
+  the actual parse error from the client. Checks database for customized template
+  first, falls back to default.
+
+  Template uses {{MERMAID_CODE}}, {{SUMMARY}}, and {{ERROR_CONTEXT}} placeholders.
   """
-  def fix_mermaid_syntax_prompt(broken_mermaid, summary) do
+  def fix_mermaid_syntax_prompt(broken_mermaid, summary, mermaid_error \\ nil) do
+    error_context = format_error_context(mermaid_error)
+
     DiagramForge.AI.get_prompt("fix_mermaid_syntax")
     |> String.replace("{{MERMAID_CODE}}", broken_mermaid)
-    |> String.replace("{{SUMMARY}}", summary)
+    |> String.replace("{{SUMMARY}}", summary || "")
+    |> String.replace("{{ERROR_CONTEXT}}", error_context)
   end
+
+  # Format the Mermaid error for inclusion in the AI prompt
+  defp format_error_context(nil), do: ""
+
+  defp format_error_context(error) when is_map(error) do
+    parts = [
+      "\n\nPARSE ERROR FROM MERMAID #{error[:mermaid_version] || @mermaid_version}:",
+      error[:message] && "Error: #{error[:message]}",
+      error[:line] && "Line: #{error[:line]}",
+      error[:expected] && "Expected: #{error[:expected]}"
+    ]
+
+    parts
+    |> Enum.filter(& &1)
+    |> Enum.join("\n")
+    |> then(&(&1 <> "\n\nFocus on fixing this specific error first."))
+  end
+
+  defp format_error_context(_), do: ""
 end
