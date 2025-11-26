@@ -2033,7 +2033,7 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
                   </div>
 
                   <div
-                    id="mermaid-preview"
+                    id={"mermaid-preview-#{:erlang.phash2(@selected_diagram.diagram_source)}"}
                     phx-hook="Mermaid"
                     class={[
                       "rounded-lg p-8 transition-colors",

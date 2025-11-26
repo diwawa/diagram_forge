@@ -59,10 +59,19 @@ const Mermaid = {
   },
   async renderDiagram() {
     const container = this.el.querySelector(".mermaid")
-    if (!container) return
+    if (!container) {
+      console.warn("Mermaid hook: no .mermaid container found")
+      return
+    }
 
     const diagramCode = this.el.dataset.diagram
-    if (!diagramCode) return
+    if (!diagramCode) {
+      console.warn("Mermaid hook: no diagram code in data-diagram attribute")
+      return
+    }
+
+    // Store reference to hook for use in async callbacks
+    const hook = this
 
     // Get theme from data attribute
     const theme = this.el.dataset.theme || "light"
@@ -81,8 +90,8 @@ const Mermaid = {
     try {
       const { svg } = await mermaid.render(diagramId, diagramCode)
       container.innerHTML = svg
-      // Clear any previous error state
-      this.pushEvent("mermaid_render_success", {})
+      // Clear any previous error state - use stored hook reference
+      hook.pushEvent("mermaid_render_success", {})
     } catch (err) {
       // Extract useful error information
       const errorInfo = {
@@ -94,8 +103,12 @@ const Mermaid = {
         mermaidVersion: mermaid.version || "unknown"
       }
 
-      // Send error to server for AI context
-      this.pushEvent("mermaid_render_error", errorInfo)
+      // Send error to server for AI context - use stored hook reference
+      try {
+        hook.pushEvent("mermaid_render_error", errorInfo)
+      } catch (pushErr) {
+        console.error("Failed to push mermaid_render_error event:", pushErr)
+      }
 
       // Display error in container
       container.innerHTML = `
