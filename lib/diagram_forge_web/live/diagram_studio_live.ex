@@ -102,7 +102,7 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
       |> assign(:public_page, public_page)
       |> load_diagrams()
 
-    # Handle diagram selection
+    # Handle diagram selection and SEO
     socket =
       if diagram_id do
         try do
@@ -116,6 +116,8 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
             |> assign(:awaiting_fix_result, false)
             |> assign(:fix_expected_hash, nil)
             |> assign(:mermaid_error, nil)
+            # SEO for individual diagram
+            |> assign_diagram_seo(diagram)
           else
             socket
             |> put_flash(:error, "You don't have permission to view this diagram")
@@ -128,11 +130,100 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
             |> push_navigate(to: ~p"/")
         end
       else
+        # SEO for homepage
         socket
+        |> assign_homepage_seo()
       end
 
     {:noreply, socket}
   end
+
+  # SEO helpers
+  defp assign_homepage_seo(socket) do
+    base_url = DiagramForgeWeb.Endpoint.url()
+
+    socket
+    |> assign(:page_title, "AI-Powered Diagram Generator")
+    |> assign(
+      :meta_description,
+      "Create beautiful Mermaid diagrams with AI. Generate flowcharts, sequence diagrams, and architecture diagrams from natural language prompts."
+    )
+    |> assign(:canonical_url, base_url)
+    |> assign(:og_type, "website")
+    |> assign(:json_ld, homepage_schema(base_url))
+  end
+
+  defp assign_diagram_seo(socket, diagram) do
+    base_url = DiagramForgeWeb.Endpoint.url()
+    diagram_url = "#{base_url}/d/#{diagram.id}"
+
+    socket
+    |> assign(:page_title, diagram.title || "Untitled Diagram")
+    |> assign(:meta_description, truncate_description(diagram.summary))
+    |> assign(:canonical_url, diagram_url)
+    |> assign(:og_type, "article")
+    |> assign(:json_ld, diagram_schema(diagram, diagram_url))
+  end
+
+  defp truncate_description(nil), do: nil
+
+  defp truncate_description(text) do
+    if String.length(text) > 160 do
+      String.slice(text, 0, 157) <> "..."
+    else
+      text
+    end
+  end
+
+  defp homepage_schema(base_url) do
+    %{
+      "@context" => "https://schema.org",
+      "@type" => "WebApplication",
+      "name" => "DiagramForge",
+      "url" => base_url,
+      "description" =>
+        "AI-powered diagram generation tool for creating Mermaid flowcharts, sequence diagrams, and architecture diagrams",
+      "applicationCategory" => "DesignApplication",
+      "operatingSystem" => "Web",
+      "offers" => %{
+        "@type" => "Offer",
+        "price" => "0",
+        "priceCurrency" => "USD"
+      }
+    }
+  end
+
+  defp diagram_schema(diagram, url) do
+    schema = %{
+      "@context" => "https://schema.org",
+      "@type" => "CreativeWork",
+      "name" => diagram.title || "Untitled Diagram",
+      "url" => url,
+      "dateCreated" => format_iso8601(diagram.inserted_at),
+      "dateModified" => format_iso8601(diagram.updated_at),
+      "creator" => %{
+        "@type" => "Organization",
+        "name" => "DiagramForge"
+      }
+    }
+
+    schema =
+      if diagram.summary do
+        Map.put(schema, "description", diagram.summary)
+      else
+        schema
+      end
+
+    if diagram.tags && diagram.tags != [] do
+      Map.put(schema, "keywords", Enum.join(diagram.tags, ", "))
+    else
+      schema
+    end
+  end
+
+  defp format_iso8601(%DateTime{} = dt), do: DateTime.to_iso8601(dt)
+  defp format_iso8601(%NaiveDateTime{} = dt), do: NaiveDateTime.to_iso8601(dt)
+  defp format_iso8601(nil), do: nil
 
   # Parse comma-separated tags from URL param
   defp parse_tags_param(nil), do: []

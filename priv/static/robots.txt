@@ -1,5 +1,16 @@
-# See https://www.robotstxt.org/robotstxt.html for documentation on how to use the robots.txt file
-#
-# To ban all spiders from the entire site uncomment the next two lines:
-# User-agent: *
-# Disallow: /
+# DiagramForge robots.txt
+# See https://www.robotstxt.org/robotstxt.html for documentation
+
+User-agent: *
+Allow: /
+Allow: /d/
+Allow: /terms
+Allow: /privacy
+
+# Disallow admin and auth routes
+Disallow: /admin/
+Disallow: /auth/
+Disallow: /dev/
+
+# Sitemap location
+Sitemap: https://diagramforge.com/sitemap.xml

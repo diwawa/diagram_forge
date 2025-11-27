@@ -324,6 +324,24 @@ defmodule DiagramForge.Diagrams do
   end
 
   @doc """
+  Returns all public and approved diagrams for sitemap generation.
+
+  Only returns diagrams that are:
+  - visibility: :public
+  - moderation_status: :approved
+
+  Results are ordered by updated_at descending.
+  """
+  def list_public_approved_diagrams do
+    Repo.all(
+      from d in Diagram,
+        where: d.visibility == :public and d.moderation_status == :approved,
+        order_by: [desc: d.updated_at],
+        select: %{id: d.id, title: d.title, updated_at: d.updated_at}
+    )
+  end
+
+  @doc """
   Gets a single diagram.
   """
   def get_diagram!(id) do

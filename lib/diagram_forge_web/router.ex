@@ -41,6 +41,7 @@ defmodule DiagramForgeWeb.Router do
     live "/terms", TermsLive
     live "/privacy", PrivacyLive
     get "/home", PageController, :home
+    get "/sitemap.xml", SitemapController, :index
   end
 
   # Admin panel - superadmin only
