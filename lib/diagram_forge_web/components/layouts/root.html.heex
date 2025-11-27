@@ -32,10 +32,10 @@
     <meta property="og:site_name" content="DiagramForge" />
     <meta :if={assigns[:og_image]} property="og:image" content={@og_image} />
     <meta :if={assigns[:og_image]} property="og:image:width" content="1200" />
-    <meta :if={assigns[:og_image]} property="og:image:height" content="630" />
+    <meta :if={assigns[:og_image]} property="og:image:height" content="633" />
 
     <%!-- Twitter Card --%>
-    <meta name="twitter:card" content={assigns[:twitter_card] || "summary"} />
+    <meta name="twitter:card" content={assigns[:twitter_card] || "summary_large_image"} />
     <meta
       name="twitter:title"
       content={assigns[:page_title] || "DiagramForge - AI-Powered Diagram Generator"}

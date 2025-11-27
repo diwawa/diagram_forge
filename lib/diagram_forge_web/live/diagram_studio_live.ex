@@ -150,6 +150,7 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
     )
     |> assign(:canonical_url, base_url)
     |> assign(:og_type, "website")
+    |> assign(:og_image, "#{base_url}/images/og-default.jpg")
     |> assign(:json_ld, homepage_schema(base_url))
   end
 
@@ -162,6 +163,7 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
     |> assign(:meta_description, truncate_description(diagram.summary))
     |> assign(:canonical_url, diagram_url)
     |> assign(:og_type, "article")
+    |> assign(:og_image, "#{base_url}/images/og-default.jpg")
     |> assign(:json_ld, diagram_schema(diagram, diagram_url))
   end
 
