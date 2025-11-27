@@ -79,6 +79,7 @@ defmodule DiagramForge.MixProject do
       {:bypass, "~> 2.1", only: :test},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
+      {:sobelow, "~> 0.13", only: [:dev, :test], runtime: false},
       {:backpex, "~> 0.16"},
       # Content moderation
       {:html_sanitize_ex, "~> 1.4"},
