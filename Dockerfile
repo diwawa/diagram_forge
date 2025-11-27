@@ -20,9 +20,14 @@ ARG RUNNER_IMAGE="docker.io/debian:${DEBIAN_VERSION}"
 
 FROM ${BUILDER_IMAGE} AS builder
 
-# install build dependencies
+# install build dependencies including Node.js for asset compilation
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends build-essential git \
+  && apt-get install -y --no-install-recommends build-essential git curl \
+  && rm -rf /var/lib/apt/lists/*
+
+# Install Node.js
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+  && apt-get install -y nodejs \
   && rm -rf /var/lib/apt/lists/*
 
 # prepare build dir
@@ -56,6 +61,9 @@ COPY lib lib
 RUN mix compile
 
 COPY assets assets
+
+# Install Node.js dependencies for assets
+RUN cd assets && npm ci
 
 # compile assets
 RUN mix assets.deploy
