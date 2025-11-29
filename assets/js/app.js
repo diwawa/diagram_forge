@@ -173,6 +173,25 @@ const CopyToClipboard = {
   }
 }
 
+// Auto-dismiss Flash Hook
+// Automatically clears flash messages after a timeout
+const AutoDismissFlash = {
+  mounted() {
+    const timeout = parseInt(this.el.dataset.dismissAfter) || 10000
+    const flashKey = this.el.dataset.flashKey
+
+    this.timer = setTimeout(() => {
+      // Push the clear-flash event to LiveView
+      this.pushEvent("lv:clear-flash", { key: flashKey })
+    }, timeout)
+  },
+  destroyed() {
+    if (this.timer) {
+      clearTimeout(this.timer)
+    }
+  }
+}
+
 // Modal Hook for dialog elements
 const Modal = {
   mounted() {
@@ -215,7 +234,7 @@ const csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute
 const liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
   params: {_csrf_token: csrfToken},
-  hooks: {...colocatedHooks, Mermaid, CopyToClipboard, Modal},
+  hooks: {...colocatedHooks, Mermaid, CopyToClipboard, Modal, AutoDismissFlash},
 })
 
 // Show progress bar on live navigation and form submits
