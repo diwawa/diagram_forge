@@ -20,7 +20,8 @@ config :diagram_forge, DiagramForgeWeb.Endpoint,
     layout: false
   ],
   pubsub_server: DiagramForge.PubSub,
-  live_view: [signing_salt: "lLb2EZbY"]
+  live_view: [signing_salt: "lLb2EZbY"],
+  gettext: [default_locale: "zh"]
 
 # Configures the mailer
 #
@@ -145,3 +146,4 @@ config :hammer,
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.
 import_config "#{config_env()}.exs"
+config :tesla, disable_deprecated_builder_warning: true

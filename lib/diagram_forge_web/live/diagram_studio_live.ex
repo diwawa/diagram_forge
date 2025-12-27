@@ -23,6 +23,8 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
     if connected?(socket) do
       Phoenix.PubSub.subscribe(DiagramForge.PubSub, "documents")
       Phoenix.PubSub.subscribe(DiagramForge.PubSub, "diagrams")
+      # 强制设置中文为当前语言
+      Gettext.put_locale(DiagramForgeWeb.Gettext, "zh")
       # Schedule periodic document refresh to auto-hide completed documents after 5 minutes
       schedule_document_refresh()
     end
@@ -768,8 +770,13 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
         {:noreply, put_flash(socket, :error, "No diagram selected")}
 
       diagram ->
-        url = url(~p"/d/#{diagram.id}")
-        {:noreply, push_event(socket, "copy-to-clipboard", %{text: url})}
+        # 如果图表没有ID（例如刚生成但未保存的图表），则无法生成分享链接
+        if diagram.id do
+          url = url(~p"/d/#{diagram.id}")
+          {:noreply, push_event(socket, "copy-to-clipboard", %{text: url})}
+        else
+          {:noreply, put_flash(socket, :error, dgettext("default", "Cannot share unsaved diagram. Please save it first."))}
+        end
     end
   end
 
@@ -796,7 +803,7 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
     prompt = String.trim(socket.assigns.prompt)
 
     if prompt == "" do
-      {:noreply, put_flash(socket, :error, "Please enter a prompt")}
+      {:noreply, put_flash(socket, :error, dgettext("default", "Please enter a prompt"))}
     else
       # Set generating state and send async message for actual generation
       send(self(), {:do_generate_from_prompt, prompt})
@@ -811,26 +818,6 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
   @impl true
   def handle_event("save_generated_diagram", _params, socket) do
     cond do
-      is_nil(socket.assigns[:current_user]) ->
-        diagram = socket.assigns.generated_diagram
-
-        # Extract diagram attributes for session storage
-        attrs = %{
-          title: diagram.title,
-          diagram_source: diagram.diagram_source,
-          summary: diagram.summary,
-          notes_md: diagram.notes_md,
-          tags: diagram.tags
-        }
-
-        # Encode attrs as JSON to pass via query parameter
-        pending_json = Jason.encode!(attrs)
-
-        {:noreply,
-         socket
-         |> put_flash(:info, "Sign in to save your diagram")
-         |> redirect(to: "/auth/github?pending_diagram=#{URI.encode_www_form(pending_json)}")}
-
       is_nil(socket.assigns.generated_diagram) ->
         {:noreply, put_flash(socket, :error, "No diagram to save")}
 
@@ -846,18 +833,36 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
           notes_md: diagram.notes_md,
           tags: diagram.tags || []
         }
+        
+        # If user is not logged in, create diagram without user association
+        case current_user do
+          nil ->
+            # Create diagram for anonymous user
+            case Diagrams.create_diagram_for_user(attrs, nil) do
+              {:ok, saved_diagram} ->
+                {:noreply,
+                 socket
+                 |> assign(:generated_diagram, nil)
+                 |> assign(:selected_diagram, saved_diagram)
+                 |> load_diagrams()
+                 |> put_flash(:info, dgettext("default", "Diagram saved successfully!"))}
 
-        case Diagrams.create_diagram_for_user(attrs, current_user.id) do
-          {:ok, saved_diagram} ->
-            {:noreply,
-             socket
-             |> assign(:generated_diagram, nil)
-             |> assign(:selected_diagram, saved_diagram)
-             |> load_diagrams()
-             |> put_flash(:info, "Diagram saved successfully!")}
+              {:error, _changeset} ->
+                {:noreply, put_flash(socket, :error, dgettext("default", "Failed to save diagram"))}
+            end
+          user ->
+            case Diagrams.create_diagram_for_user(attrs, user.id) do
+              {:ok, saved_diagram} ->
+                {:noreply,
+                 socket
+                 |> assign(:generated_diagram, nil)
+                 |> assign(:selected_diagram, saved_diagram)
+                 |> load_diagrams()
+                 |> put_flash(:info, dgettext("default", "Diagram saved successfully!"))}
 
-          {:error, _changeset} ->
-            {:noreply, put_flash(socket, :error, "Failed to save diagram")}
+              {:error, _changeset} ->
+                {:noreply, put_flash(socket, :error, dgettext("default", "Failed to save diagram"))}
+            end
         end
     end
   end
@@ -868,7 +873,7 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
      socket
      |> assign(:generated_diagram, nil)
      |> assign(:selected_diagram, nil)
-     |> put_flash(:info, "Diagram discarded")}
+     |> put_flash(:info, dgettext("default", "Diagram discarded"))}
   end
 
   @impl true
@@ -885,9 +890,11 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
       # Set uploading state immediately for UI feedback
       socket = assign(socket, :uploading, true)
 
+      user_id = socket.assigns.current_user && socket.assigns.current_user.id
+      
       uploaded_files =
         consume_uploaded_entries(socket, :document, fn %{path: path}, entry ->
-          process_uploaded_entry(path, entry, socket.assigns.current_user.id)
+          process_uploaded_entry(path, entry, user_id)
         end)
 
       {:noreply,
@@ -917,7 +924,7 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
     end
   end
 
-  defp process_uploaded_entry(path, entry, user_id) do
+  defp process_uploaded_entry(path, entry, user_id) when not is_nil(user_id) do
     dest = Path.join([System.tmp_dir(), "#{entry.uuid}#{Path.extname(entry.client_name)}"])
     File.cp!(path, dest)
 
@@ -947,6 +954,11 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
     end
   end
 
+  defp process_uploaded_entry(_path, _entry, nil) do
+    # For anonymous users, show a message prompting them to sign in
+    {:postpone, :error}
+  end
+
   # PubSub and async message handlers
 
   @impl true
@@ -962,13 +974,13 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
          |> assign(:selected_diagram, diagram)
          |> assign(:generated_diagram, diagram)
          |> assign(:generating, false)
-         |> put_flash(:info, "Diagram generated! Click Save to persist it.")}
+         |> put_flash(:info, dgettext("default", "Diagram generated! Sign in to save it."))}
 
       {:error, reason} ->
         {:noreply,
          socket
          |> assign(:generating, false)
-         |> put_flash(:error, "Failed to generate diagram: #{inspect(reason)}")}
+         |> put_flash(:error, dgettext("default", "Failed to generate diagram: %{reason}", reason: inspect(reason)))}
     end
   end
 
@@ -1247,7 +1259,8 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
   end
 
   defp upload_error_to_string(:too_large), do: "File is too large (max 2MB)"
-  defp upload_error_to_string(:not_accepted), do: "Invalid file type (use PDF, Markdown, or Text)"
+  defp upload_error_to_string(:not_accepted), do: dgettext("default", "Invalid file type (use PDF, Markdown, or Text)")
+
   defp upload_error_to_string(:too_many_files), do: "Only one file can be uploaded at a time"
   defp upload_error_to_string(_), do: "Upload error"
 
@@ -1301,18 +1314,18 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
           <div class="flex items-center justify-between">
             <div class="flex items-center gap-3">
               <img src={~p"/images/logo.png"} alt="DiagramForge" class="h-10 w-10" />
-              <h1 class="text-xl font-bold text-slate-100">DiagramForge Studio</h1>
+              <h1 class="text-xl font-bold text-slate-100"><%= dgettext("default", "DiagramForge Studio") %></h1>
             </div>
             <%!-- Support Links - visible to all --%>
             <div class="hidden sm:flex items-center gap-2 text-sm text-slate-400">
-              <span>Support this project →</span>
+              <span><%= dgettext("default", "Support this project →") %></span>
               <a
                 href={Application.get_env(:diagram_forge, :github_sponsors_url)}
                 target="_blank"
                 rel="noopener"
                 class="hover:text-slate-200 transition"
               >
-                GitHub
+                <%= dgettext("default", "GitHub") %>
               </a>
               <span>|</span>
               <a
@@ -1321,7 +1334,7 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
                 rel="noopener"
                 class="hover:text-slate-200 transition"
               >
-                Stripe
+                <%= dgettext("default", "Stripe") %>
               </a>
               <span class="mx-2">·</span>
               <a
@@ -1330,7 +1343,7 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
                 rel="noopener"
                 class="hover:text-slate-200 transition"
               >
-                Get in touch
+                <%= dgettext("default", "Get in touch") %>
               </a>
             </div>
             <div class="flex items-center gap-4">
@@ -1344,7 +1357,7 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
                     />
                   <% end %>
                   <span class="text-sm text-slate-300">
-                    {@current_user.name || @current_user.email}
+                    <%= @current_user.name || @current_user.email %>
                   </span>
                   <%= if @is_superadmin do %>
                     <span class="px-2 py-1 text-xs bg-purple-600 text-white rounded">
@@ -1355,7 +1368,7 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
                     href="/auth/logout"
                     class="px-3 py-1.5 text-sm bg-slate-800 hover:bg-slate-700 text-slate-300 rounded transition"
                   >
-                    Sign Out
+                    <%= dgettext("default", "Sign Out") %>
                   </.link>
                 </div>
               <% else %>
@@ -1366,7 +1379,7 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
                   <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
                   </svg>
-                  Sign in with GitHub
+                  <%= dgettext("default", "Sign in with GitHub") %>
                 </.link>
               <% end %>
             </div>
@@ -1427,7 +1440,6 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
           <%!-- Left Sidebar --%>
           <div class="lg:col-span-1 flex flex-col gap-3">
             <%!-- Upload Zone (compact when no documents) --%>
-            <%= if @current_user do %>
               <form phx-change="validate" phx-submit="save" id="upload-form">
                 <div
                   class="border-2 border-dashed border-slate-700 rounded-lg p-3 text-center cursor-pointer hover:border-slate-600 transition bg-slate-900/50"
@@ -1438,10 +1450,10 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
                     <div class="text-slate-400">
                       <div class="flex items-center justify-center gap-2 mb-1">
                         <.icon name="hero-arrow-up-tray" class="w-4 h-4" />
-                        <span class="text-xs font-medium">Upload a document</span>
+                        <span class="text-xs font-medium"><%= dgettext("default", "Upload a document") %></span>
                       </div>
                       <p class="text-xs text-slate-500">
-                        PDF, Markdown, or Text (max 2MB)
+                        <%= dgettext("default", "PDF, Markdown, or Text (max 2MB)") %>
                       </p>
                     </div>
                   </label>
@@ -1519,26 +1531,6 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
                   </button>
                 <% end %>
               </form>
-            <% else %>
-              <%!-- Login prompt for document upload --%>
-              <div class="border-2 border-dashed border-slate-700 rounded-lg p-3 text-center bg-slate-900/50">
-                <div class="text-slate-400">
-                  <div class="flex items-center justify-center gap-2 mb-1">
-                    <.icon name="hero-arrow-up-tray" class="w-4 h-4" />
-                    <span class="text-xs font-medium">Upload a document</span>
-                  </div>
-                  <p class="text-xs text-slate-500 mb-2">
-                    PDF, Markdown, or Text (max 2MB)
-                  </p>
-                  <.link
-                    href={~p"/auth/github"}
-                    class="text-xs text-blue-400 hover:text-blue-300 underline"
-                  >
-                    Sign in to upload documents
-                  </.link>
-                </div>
-              </div>
-            <% end %>
 
             <%!-- Documents Section (only shown when documents exist) --%>
             <%= if @documents != [] do %>
@@ -1742,7 +1734,7 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
               <%!-- My Diagrams Section --%>
               <div class="mb-4">
                 <h2 class="text-lg font-semibold mb-2">
-                  My Diagrams ({@total_owned_diagrams})
+                  <%= dgettext("default", "My Diagrams (%{count})", count: @total_owned_diagrams) %>
                 </h2>
 
                 <%!-- Pagination Controls --%>
@@ -1750,7 +1742,7 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
                 <%= if @total_owned_diagrams > 0 do %>
                   <div class="flex items-center justify-between mb-3 pb-2 border-b border-slate-800 text-xs">
                     <form phx-change="change_page_size" class="flex items-center gap-2">
-                      <span class="text-slate-400">Show:</span>
+                      <span class="text-slate-400"><%= dgettext("default", "Show:") %></span>
                       <select
                         name="page_size"
                         class="bg-slate-800 text-slate-300 rounded px-2 py-1 text-xs"
@@ -1764,7 +1756,7 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
                     </form>
                     <div class="flex items-center gap-2">
                       <span class="text-slate-400">
-                        Page {@page} of {total_pages}
+                        <%= dgettext("default", "Page %{current} of %{total}", current: @page, total: total_pages) %>
                       </span>
                       <div class="flex gap-1">
                         <button
@@ -1826,7 +1818,7 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
 
                   <%= if @owned_diagrams == [] do %>
                     <p class="text-sm text-slate-400 text-center py-4">
-                      No diagrams yet. Upload a document or generate from prompt.
+                      <%= dgettext("default", "No diagrams yet. Upload a document or generate from prompt.") %>
                     </p>
                   <% end %>
                 </div>
@@ -1836,7 +1828,7 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
               <%= if @bookmarked_diagrams != [] do %>
                 <div class="mb-4 border-t border-slate-800 pt-4">
                   <h2 class="text-lg font-semibold mb-2">
-                    Bookmarked Diagrams ({length(@bookmarked_diagrams)})
+                    <%= dgettext("default", "Bookmarked Diagrams (%{count})", count: length(@bookmarked_diagrams)) %>
                   </h2>
                   <div class="space-y-2 max-h-64 overflow-y-auto">
                     <%= for diagram <- @bookmarked_diagrams do %>
@@ -1869,7 +1861,7 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
               <div class="border-t border-slate-800 pt-4">
                 <div class="flex items-center justify-between mb-2">
                   <h2 class="text-lg font-semibold">
-                    Public Diagrams ({@total_public_diagrams})
+                    <%= dgettext("default", "Public Diagrams (%{count})", count: @total_public_diagrams) %>
                   </h2>
                   <%!-- Toggle only shown for logged-in users --%>
                   <%= if @current_user do %>
@@ -1878,8 +1870,8 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
                       class="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-200 transition"
                       title={
                         if @show_public_diagrams,
-                          do: "Hide public diagrams",
-                          else: "Show public diagrams"
+                          do: dgettext("default", "Hide public diagrams"),
+                          else: dgettext("default", "Show public diagrams")
                       }
                     >
                       <%= if @show_public_diagrams do %>
@@ -1897,7 +1889,7 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
                   <%= if @total_public_diagrams > 0 do %>
                     <div class="flex items-center justify-between mb-3 pb-2 border-b border-slate-800 text-xs">
                       <form phx-change="change_page_size" class="flex items-center gap-2">
-                        <span class="text-slate-400">Show:</span>
+                        <span class="text-slate-400"><%= dgettext("default", "Show:") %></span>
                         <select
                           name="page_size"
                           class="bg-slate-800 text-slate-300 rounded px-2 py-1 text-xs"
@@ -1911,7 +1903,7 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
                       </form>
                       <div class="flex items-center gap-2">
                         <span class="text-slate-400">
-                          Page {@public_page} of {public_total_pages}
+                          <%= dgettext("default", "Page %{current} of %{total}", current: @public_page, total: public_total_pages) %>
                         </span>
                         <div class="flex gap-1">
                           <button
@@ -1975,7 +1967,7 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
 
                     <%= if @public_diagrams == [] do %>
                       <p class="text-sm text-slate-400 text-center py-4">
-                        No public diagrams available
+                        <%= dgettext("default", "No public diagrams available") %>
                       </p>
                     <% end %>
                   </div>
@@ -1985,12 +1977,12 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
               <%!-- Tips Section --%>
               <div class="mt-auto pt-4 border-t border-slate-800">
                 <h2 class="text-lg font-semibold mb-2 flex items-center gap-2">
-                  <.icon name="hero-light-bulb" class="w-4 h-4 text-amber-400" /> Tips
+                  <.icon name="hero-light-bulb" class="w-4 h-4 text-amber-400" /> <%= dgettext("default", "Tips") %>
                 </h2>
                 <div class="text-xs text-slate-400 space-y-1">
-                  <div>• Click tags to filter diagrams</div>
-                  <div>• Save filters for quick access</div>
-                  <div>• Fork public diagrams to customize</div>
+                  <div><%= dgettext("default", "• Click tags to filter diagrams") %></div>
+                  <div><%= dgettext("default", "• Save filters for quick access") %></div>
+                  <div><%= dgettext("default", "• Fork public diagrams to customize") %></div>
                 </div>
               </div>
             </div>
@@ -2265,8 +2257,8 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
                         d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                       />
                     </svg>
-                    <p class="text-lg">Select a diagram to view</p>
-                    <p class="text-sm mt-1">Click on a diagram from the sidebar</p>
+                    <p class="text-lg"><%= dgettext("default", "Select a diagram to view") %></p>
+                    <p class="text-sm mt-1"><%= dgettext("default", "Click on a diagram from the sidebar") %></p>
                   </div>
                 </div>
               <% end %>
@@ -2274,14 +2266,14 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
 
             <%!-- Generate from Prompt --%>
             <div class="bg-slate-900 rounded-xl p-4">
-              <h2 class="text-xl font-semibold mb-3">Generate from Prompt</h2>
+              <h2 class="text-xl font-semibold mb-3"><%= dgettext("default", "Generate from Prompt") %></h2>
 
               <form phx-submit="generate_from_prompt" class="space-y-3">
                 <textarea
                   name="prompt"
                   value={@prompt}
                   phx-change="update_prompt"
-                  placeholder="e.g., Create a diagram showing how GenServer handles messages"
+                  placeholder={dgettext("default", "e.g., Create a diagram showing how GenServer handles messages")}
                   class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded focus:border-slate-600 focus:outline-none resize-y"
                   rows="3"
                   disabled={@generating}
@@ -2319,9 +2311,9 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
                       >
                       </path>
                     </svg>
-                    <span>Generating...</span>
+                    <span><%= dgettext("default", "Generating...") %></span>
                   <% else %>
-                    <span>Generate Diagram</span>
+                    <span><%= dgettext("default", "Generate Diagram") %></span>
                   <% end %>
                 </button>
               </form>
@@ -2336,9 +2328,9 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
           <div class="flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
             <span>© {Date.utc_today().year} DiagramForge</span>
             <span class="hidden sm:inline">·</span>
-            <a href="/terms" class="hover:text-slate-300 transition">Terms of Service</a>
+            <a href="/terms" class="hover:text-slate-300 transition"><%= dgettext("default", "Terms of Service") %></a>
             <span class="hidden sm:inline">·</span>
-            <a href="/privacy" class="hover:text-slate-300 transition">Privacy Policy</a>
+            <a href="/privacy" class="hover:text-slate-300 transition"><%= dgettext("default", "Privacy Policy") %></a>
             <span class="hidden sm:inline">·</span>
             <a
               href={Application.get_env(:diagram_forge, :github_issues_url)}
@@ -2346,7 +2338,7 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
               rel="noopener"
               class="hover:text-slate-300 transition"
             >
-              Report an Issue
+              <%= dgettext("default", "Report an Issue") %>
             </a>
           </div>
         </div>
@@ -2356,15 +2348,15 @@ defmodule DiagramForgeWeb.DiagramStudioLive do
       <%= if @show_save_filter_modal do %>
         <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div class="bg-slate-900 rounded-lg p-6 max-w-md w-full mx-4">
-            <h2 class="text-xl font-bold mb-4">Save Current Filter</h2>
+            <h2 class="text-xl font-bold mb-4"><%= dgettext("default", "Save Current Filter") %></h2>
 
             <form phx-submit="save_current_filter" class="space-y-4">
               <div>
-                <label class="block text-sm font-medium mb-2">Filter Name</label>
+                <label class="block text-sm font-medium mb-2"><%= dgettext("default", "Filter Name") %></label>
                 <input
                   type="text"
                   name="name"
-                  placeholder="e.g., Interview Prep"
+                  placeholder={dgettext("default", "e.g., Interview Prep")}
                   required
                   class="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded focus:border-blue-500 focus:outline-none"
                 />

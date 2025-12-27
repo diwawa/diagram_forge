@@ -1,0 +1,407 @@
+## "msgid"s in this file come from POT (.pot) files.
+###
+### Do not add, change, or remove "msgid"s manually here as
+### they're tied to the ones in the corresponding POT file
+### (with the same domain).
+###
+### Use "mix gettext.extract --merge" or "mix gettext.merge"
+### to merge POT files into PO files.
+msgid ""
+msgstr ""
+"Language: zh\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+
+#: lib/diagram_forge_web/components/core_components.ex:343
+#, elixir-autogen, elixir-format
+msgid "Actions"
+msgstr "操作"
+
+#: lib/diagram_forge_web/components/layouts.ex:99
+#: lib/diagram_forge_web/components/layouts.ex:111
+#, elixir-autogen, elixir-format
+msgid "Attempting to reconnect"
+msgstr "正在尝试重新连接"
+
+#: lib/diagram_forge_web/components/layouts.ex:106
+#, elixir-autogen, elixir-format
+msgid "Something went wrong!"
+msgstr "出现问题！"
+
+#: lib/diagram_forge_web/components/layouts.ex:94
+#, elixir-autogen, elixir-format
+msgid "We can't find the internet"
+msgstr "无法连接到网络"
+
+#: lib/diagram_forge_web/components/core_components.ex:75
+#, elixir-autogen, elixir-format
+msgid "close"
+msgstr "关闭"
+
+msgid "DiagramForge Studio"
+msgstr "DiagramForge 工作室"
+
+msgid "Support this project →"
+msgstr "支持这个项目 →"
+
+msgid "GitHub"
+msgstr "GitHub"
+
+msgid "Stripe"
+msgstr "Stripe"
+
+msgid "Get in touch"
+msgstr "联系我们"
+
+msgid "Sign in with GitHub"
+msgstr "使用 GitHub 登录"
+
+msgid "Sign Out"
+msgstr "退出登录"
+
+msgid "Upload a document"
+msgstr "上传文档"
+
+msgid "PDF, Markdown, or Text (max 2MB)"
+msgstr "PDF、Markdown 或文本（最大 2MB）"
+
+msgid "My Diagrams (%{count})"
+msgstr "我的图表（%{count}）"
+
+msgid "Show:"
+msgstr "显示："
+
+msgid "Page %{current} of %{total}"
+msgstr "第 %{current} 页，共 %{total} 页"
+
+msgid "No diagrams yet. Upload a document or generate from prompt."
+msgstr "暂无图表。上传文档或根据提示生成。"
+
+msgid "Bookmarked Diagrams (%{count})"
+msgstr "收藏的图表（%{count}）"
+
+msgid "Hide public diagrams"
+msgstr "隐藏公共图表"
+
+msgid "Show public diagrams"
+msgstr "显示公共图表"
+
+msgid "Public Diagrams (%{count})"
+msgstr "公共图表（%{count}）"
+
+msgid "No public diagrams available"
+msgstr "暂无公共图表"
+
+msgid "Tips"
+msgstr "提示"
+
+msgid "• Click tags to filter diagrams"
+msgstr "• 点击标签筛选图表"
+
+msgid "• Save filters for quick access"
+msgstr "• 保存筛选条件以便快速访问"
+
+msgid "• Fork public diagrams to customize"
+msgstr "• 复刻公共图表进行自定义"
+
+msgid "Cannot share unsaved diagram. Please save it first."
+msgstr "无法分享未保存的图表。请先保存。"
+
+msgid "Please enter a prompt"
+msgstr "请输入提示"
+
+msgid "No diagram to save"
+msgstr "没有可保存的图表"
+
+msgid "Diagram saved successfully!"
+msgstr "图表保存成功！"
+
+msgid "Failed to save diagram"
+msgstr "保存图表失败"
+
+msgid "Diagram discarded"
+msgstr "图表已丢弃"
+
+msgid "Diagram generated! Sign in to save it."
+msgstr "图表已生成！登录以保存。"
+
+msgid "Failed to generate diagram: %{reason}"
+msgstr "生成图表失败：%{reason}"
+
+msgid "Invalid file type (use PDF, Markdown, or Text)"
+msgstr "无效的文件类型（使用 PDF、Markdown 或文本）"
+
+msgid "Select a diagram to view"
+msgstr "选择图表查看"
+
+msgid "Click on a diagram from the sidebar"
+msgstr "从侧边栏选择一个图表"
+
+msgid "Generate from Prompt"
+msgstr "根据提示生成"
+
+msgid "e.g., Create a diagram showing how GenServer handles messages"
+msgstr "例如：创建一个展示 GenServer 如何处理消息的图表"
+
+msgid "Generate Diagram"
+msgstr "生成图表"
+
+msgid "Generating..."
+msgstr "生成中..."
+
+msgid "Terms of Service"
+msgstr "服务条款"
+
+msgid "Privacy Policy"
+msgstr "隐私政策"
+
+msgid "Report an Issue"
+msgstr "报告问题"
+
+msgid "Save Current Filter"
+msgstr "保存当前筛选条件"
+
+msgid "Filter Name"
+msgstr "筛选名称"
+
+msgid "e.g., Interview Prep"
+msgstr "例如：面试准备"
+
+msgid "Last updated: %{date}"
+msgstr "最后更新：%{date}"
+
+msgid "1. Acceptance of Terms"
+msgstr "1. 条款接受"
+
+msgid "By accessing and using DiagramForge (\"the Service\"), you agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use the Service."
+msgstr "通过访问和使用 DiagramForge（\"服务\"），您同意受这些服务条款的约束。如果您不同意这些条款，请不要使用该服务。"
+
+msgid "2. Description of Service"
+msgstr "2. 服务描述"
+
+msgid "DiagramForge is a web application that helps developers create and manage technical diagrams using AI-powered generation from documents and prompts. The Service uses Mermaid syntax for diagram rendering."
+msgstr "DiagramForge 是一个帮助开发者使用 AI 从文档和提示生成技术图表的 Web 应用程序。该服务使用 Mermaid 语法进行图表渲染。"
+
+msgid "3. User Accounts"
+msgstr "3. 用户账户"
+
+msgid "You must authenticate via GitHub to use certain features of the Service."
+msgstr "您必须通过 GitHub 认证才能使用服务的某些功能。"
+
+msgid "You are responsible for maintaining the security of your GitHub account."
+msgstr "您有责任维护 GitHub 账户的安全。"
+
+msgid "You are responsible for all activities that occur under your account."
+msgstr "您对账户下发生的所有活动负责。"
+
+msgid "4. Acceptable Use"
+msgstr "4. 可接受的使用"
+
+msgid "You agree not to:"
+msgstr "您同意不："
+
+msgid "Use the Service for any unlawful purpose or in violation of any laws."
+msgstr "将服务用于任何非法目的或违反任何法律。"
+
+msgid "Upload malicious content or attempt to compromise the Service."
+msgstr "上传恶意内容或试图破坏服务。"
+
+msgid "Abuse or overload the Service with excessive requests."
+msgstr "滥用或通过过多请求使服务过载。"
+
+msgid "Share content that infringes on intellectual property rights."
+msgstr "分享侵犯知识产权的内容。"
+
+msgid "5. User Content"
+msgstr "5. 用户内容"
+
+msgid "You retain ownership of diagrams and documents you create."
+msgstr "您保留所创建图表和文档的所有权。"
+
+msgid "By making content public, you grant other users the right to view and fork it."
+msgstr "通过将内容公开，您授予其他用户查看和复刻它的权利。"
+
+msgid "We do not claim ownership of your content."
+msgstr "我们不主张对您内容的所有权。"
+
+msgid "6. Service Availability"
+msgstr "6. 服务可用性"
+
+msgid "The Service is provided \"as is\" without warranty of any kind. We do not guarantee that the Service will be available at all times or free from errors. We may modify, suspend, or discontinue the Service at any time without notice."
+msgstr "服务按\"原样\"提供，不提供任何类型的担保。我们不保证服务将始终可用或无错误。我们可能随时修改、暂停或停止服务，恕不另行通知。"
+
+msgid "7. Limitation of Liability"
+msgstr "7. 责任限制"
+
+msgid "To the maximum extent permitted by law, DiagramForge and its maintainers shall not be liable for any indirect, incidental, special, consequential, or punitive damages arising from your use of the Service."
+msgstr "在法律允许的最大范围内，DiagramForge 及其维护者不对因您使用服务而产生的任何间接、偶然、特殊、后果性或惩罚性损害负责。"
+
+msgid "8. Termination"
+msgstr "8. 终止"
+
+msgid "We reserve the right to terminate or suspend your access to the Service at any time, with or without cause, and with or without notice. Upon termination, your right to use the Service will immediately cease."
+msgstr "我们保留随时终止或暂停您访问服务的权利，无论有无原因，无论是否通知。终止后，您使用服务的权利将立即停止。"
+
+msgid "9. Changes to Terms"
+msgstr "9. 条款变更"
+
+msgid "We may update these Terms of Service from time to time. We will notify users of significant changes by posting a notice on the Service. Your continued use of the Service after changes constitutes acceptance of the new terms."
+msgstr "我们可能不时更新这些服务条款。我们将通过在服务上发布通知来通知用户重大变更。您在变更后继续使用服务即表示接受新条款。"
+
+msgid "10. Contact"
+msgstr "10. 联系方式"
+
+msgid "For questions about these Terms of Service, please contact us via"
+msgstr "有关这些服务条款的问题，请通过"
+
+msgid "or open an issue on"
+msgstr "或在"
+
+msgid "Back to DiagramForge"
+msgstr "返回 DiagramForge"
+
+msgid "1. Information We Collect"
+msgstr "1. 我们收集的信息"
+
+msgid "Account Information"
+msgstr "账户信息"
+
+msgid "When you sign in via GitHub OAuth, we collect:"
+msgstr "当您通过 GitHub OAuth 登录时，我们收集："
+
+msgid "Your GitHub username and user ID"
+msgstr "您的 GitHub 用户名和用户 ID"
+
+msgid "Your email address (from your GitHub profile)"
+msgstr "您的电子邮件地址（来自您的 GitHub 个人资料）"
+
+msgid "Your display name (from your GitHub profile)"
+msgstr "您的显示名称（来自您的 GitHub 个人资料）"
+
+msgid "Your avatar URL (from your GitHub profile)"
+msgstr "您的头像 URL（来自您的 GitHub 个人资料）"
+
+msgid "User-Generated Content"
+msgstr "用户生成的内容"
+
+msgid "We store content you create, including:"
+msgstr "我们存储您创建的内容，包括："
+
+msgid "Diagrams you create or generate"
+msgstr "您创建或生成的图表"
+
+msgid "Documents you upload for diagram generation"
+msgstr "您上传用于图表生成的文档"
+
+msgid "Tags and filters you create"
+msgstr "您创建的标签和筛选条件"
+
+msgid "Your visibility preferences for diagrams"
+msgstr "您对图表的可见性偏好"
+
+msgid "2. How We Use Your Information"
+msgstr "2. 我们如何使用您的信息"
+
+msgid "We use your information to:"
+msgstr "我们使用您的信息来："
+
+msgid "Provide and maintain the Service"
+msgstr "提供和维护服务"
+
+msgid "Authenticate your identity"
+msgstr "验证您的身份"
+
+msgid "Store and display your diagrams"
+msgstr "存储和显示您的图表"
+
+msgid "Enable sharing features (public diagrams, forking)"
+msgstr "启用共享功能（公共图表、复刻）"
+
+msgid "Improve the Service based on usage patterns"
+msgstr "根据使用模式改进服务"
+
+msgid "3. Third-Party Services"
+msgstr "3. 第三方服务"
+
+msgid "DiagramForge uses the following third-party services:"
+msgstr "DiagramForge 使用以下第三方服务："
+
+msgid "privacy policy"
+msgstr "隐私政策"
+
+msgid "If you choose to support the project via Stripe, your payment information is handled by Stripe according to their"
+msgstr "如果您选择通过 Stripe 支持该项目，您的付款信息将由 Stripe 根据其"
+
+msgid "We do not store your payment card details."
+msgstr "我们不存储您的付款卡详细信息。"
+
+msgid "4. Data Retention"
+msgstr "4. 数据保留"
+
+msgid "Your account information is retained as long as your account is active."
+msgstr "只要您的账户处于活动状态，您的账户信息就会被保留。"
+
+msgid "Diagrams and content are retained until you delete them."
+msgstr "图表和内容将被保留直到您删除它们。"
+
+msgid "Uploaded documents are processed and then deleted after diagram generation."
+msgstr "上传的文档在图表生成后会被处理并删除。"
+
+msgid "You can request deletion of your account and all associated data."
+msgstr "您可以请求删除您的账户和所有相关数据。"
+
+msgid "5. Your Rights"
+msgstr "5. 您的权利"
+
+msgid "You have the right to:"
+msgstr "您有权："
+
+msgid "Access your personal data"
+msgstr "访问您的个人数据"
+
+msgid "Correct inaccurate data"
+msgstr "更正不准确的数据"
+
+msgid "Delete your account and associated data"
+msgstr "删除您的账户和相关数据"
+
+msgid "Export your diagrams"
+msgstr "导出您的图表"
+
+msgid "Control the visibility of your diagrams (private, unlisted, public)"
+msgstr "控制图表的可见性（私有、未列出、公共）"
+
+msgid "6. Data Security"
+msgstr "6. 数据安全"
+
+msgid "We implement reasonable security measures to protect your data, including:"
+msgstr "我们实施合理的安全措施来保护您的数据，包括："
+
+msgid "HTTPS encryption for all data in transit"
+msgstr "对所有传输中的数据进行 HTTPS 加密"
+
+msgid "Secure database storage"
+msgstr "安全的数据库存储"
+
+msgid "OAuth-based authentication (no passwords stored)"
+msgstr "基于 OAuth 的认证（不存储密码）"
+
+msgid "However, no method of transmission over the Internet is 100% secure. We cannot guarantee absolute security of your data."
+msgstr "然而，通过互联网传输的任何方法都不是100%安全的。我们无法保证您的数据绝对安全。"
+
+msgid "7. Cookies"
+msgstr "7. Cookie"
+
+msgid "We use essential cookies for authentication and session management. We do not use tracking or advertising cookies."
+msgstr "我们使用必要的 Cookie 进行认证和会话管理。我们不使用跟踪或广告 Cookie。"
+
+msgid "8. Changes to This Policy"
+msgstr "8. 本政策的变更"
+
+msgid "We may update this Privacy Policy from time to time. We will notify users of significant changes by posting a notice on the Service. Your continued use of the Service after changes constitutes acceptance of the updated policy."
+msgstr "我们可能不时更新本隐私政策。我们将通过在服务上发布通知来通知用户重大变更。您在变更后继续使用服务即表示接受更新后的政策。"
+
+msgid "9. Contact"
+msgstr "9. 联系方式"
+
+msgid "For questions about this Privacy Policy or to exercise your data rights, please contact us via"
+msgstr "有关本隐私政策的问题或行使您的数据权利，请通过"

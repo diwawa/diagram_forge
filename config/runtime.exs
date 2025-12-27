@@ -9,9 +9,11 @@ import Config
 
 # Configure AI client (test environment uses config/test.exs)
 unless config_env() == :test do
+  # Use SiliconFlow configuration by default
   config :diagram_forge, DiagramForge.AI,
-    api_key: System.get_env("OPENAI_API_KEY"),
-    model: "gpt-4o-mini"
+    api_key: "sk-76c6f3e5b2fb46e8a35c9839f139fa10",  # 请替换为您的实际API密钥
+    model: "qwen3-max",
+    base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1"
 end
 
 # Configure superadmin (test environment uses config/test.exs)

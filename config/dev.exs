@@ -20,11 +20,11 @@ config :diagram_forge, DiagramForgeWeb.Endpoint,
   # Binding to loopback ipv4 address prevents access from other machines.
   # Change to `ip: {0, 0, 0, 0}` to allow access from other machines.
   http: [ip: {127, 0, 0, 1}, port: String.to_integer(System.get_env("PORT") || "4000")],
-  url: [host: "superb-ungloweringly-williams.ngrok-free.dev", scheme: "https", port: 443],
+  url: [host: "localhost", scheme: "http", port: 4000],
   check_origin: false,
   code_reloader: true,
   debug_errors: true,
-  secret_key_base: "qtQX/HAp8onF7MQ6uLt8JtbEXgDdMWaIjgulHcmlFX0TZ8IfBvGBfxHE6tVdWeDX",
+  secret_key_base: "qtQX/HAp8onF7MQ6uLt8JtbEXgDdMWaIjgulHcmlFX0TZ8IfBvGBfxHE6tVdWeDXx4h4yZv4fJ4L5m2K8n7P9q3R2s6T7u8V9w0X1Y3z5A6b8C9d2E3f4G5h7I8j9K0l1M2n3",
   watchers: [
     esbuild: {Esbuild, :install_and_run, [:diagram_forge, ~w(--sourcemap=inline --watch)]},
     tailwind: {Tailwind, :install_and_run, [:diagram_forge, ~w(--watch)]}
@@ -56,7 +56,6 @@ config :diagram_forge, DiagramForgeWeb.Endpoint,
 # Watch static and templates for browser reloading.
 config :diagram_forge, DiagramForgeWeb.Endpoint,
   live_reload: [
-    web_console_logger: true,
     patterns: [
       ~r"priv/static/(?!uploads/).*(js|css|png|jpeg|jpg|gif|svg)$",
       ~r"priv/gettext/.*(po)$",
@@ -70,8 +69,13 @@ config :diagram_forge, dev_routes: true
 # Do not include metadata nor timestamps in development logs
 config :logger, :default_formatter, format: "[$level] $message $metadata\n"
 
+# Add a console handler
+config :logger, :console,
+  format: "[$level] $message\n",
+  level: :info
+
 # Add a file handler
-config :logger, :default_handler,
+config :logger, :file,
   config: [
     file: ~c"logs/dev.log",
     filesync_repeat_interval: 5000,
@@ -102,8 +106,8 @@ config :swoosh, :api_client, false
 
 # Configure GitHub OAuth for development
 config :ueberauth, Ueberauth.Strategy.Github.OAuth,
-  client_id: System.get_env("GITHUB_CLIENT_ID"),
-  client_secret: System.get_env("GITHUB_CLIENT_SECRET")
+  client_id: System.get_env("GITHUB_CLIENT_ID") || "dummy_client_id",
+  client_secret: System.get_env("GITHUB_CLIENT_SECRET") || "dummy_client_secret"
 
 # Configure Cloak encryption for development
 config :diagram_forge, DiagramForge.Vault,

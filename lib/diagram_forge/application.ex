@@ -7,6 +7,9 @@ defmodule DiagramForge.Application do
 
   @impl true
   def start(_type, _args) do
+    # Set default locale to Chinese
+    Gettext.put_locale(DiagramForgeWeb.Gettext, "zh")
+    
     children = [
       DiagramForgeWeb.Telemetry,
       DiagramForge.Repo,

@@ -75,12 +75,31 @@ defmodule DiagramForge.AI.Client do
   end
 
   # Private functions
+  
+  # 确保消息包含中文指示，让AI使用中文回复
+  defp ensure_chinese_instructions(messages) do
+    # 检查是否已经有system消息
+    case Enum.find(messages, fn msg -> msg["role"] == "system" end) do
+      nil ->
+        # 如果没有system消息，添加一个
+        [%{"role" => "system", "content" => "You must respond in Chinese (中文) and provide all responses in Chinese language."} | messages]
+      _system_msg ->
+        # 如果已经有system消息，在内容中添加中文要求
+        Enum.map(messages, fn msg ->
+          if msg["role"] == "system" do
+            %{msg | "content" => msg["content"] <> " \n\nPlease respond in Chinese (中文)."}
+          else
+            msg
+          end
+        end)
+    end
+  end
 
   defp get_config(opts) do
     config = Application.get_env(:diagram_forge, DiagramForge.AI, [])
-    api_key = opts[:api_key] || config[:api_key] || raise "Missing OPENAI_API_KEY"
+    api_key = opts[:api_key] || config[:api_key] || raise "Missing AI API_KEY (either OPENAI_API_KEY or SILICONFLOW_API_KEY)"
     model = opts[:model] || config[:model] || "gpt-4o-mini"
-    base_url = opts[:base_url] || "https://api.openai.com/v1"
+    base_url = opts[:base_url] || config[:base_url] || "https://api.openai.com/v1"
     {api_key, model, base_url}
   end
 
@@ -98,9 +117,12 @@ defmodule DiagramForge.AI.Client do
   end
 
   defp make_request(api_key, model, messages, base_url) do
+    # 添加中文支持到消息中，确保AI使用中文回复
+    messages_with_chinese = ensure_chinese_instructions(messages)
+    
     body = %{
       "model" => model,
-      "messages" => messages,
+      "messages" => messages_with_chinese,
       "response_format" => %{"type" => "json_object"}
     }
 

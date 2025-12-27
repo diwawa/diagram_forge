@@ -15,6 +15,7 @@ defmodule DiagramForgeWeb.UserLive do
   alias DiagramForge.Accounts
 
   def on_mount(:default, _params, session, socket) do
+    Gettext.put_locale(DiagramForgeWeb.Gettext, "zh")
     user_id = session["user_id"]
 
     socket =
@@ -31,14 +32,8 @@ defmodule DiagramForgeWeb.UserLive do
   end
 
   def on_mount(:require_auth, _params, session, socket) do
-    case on_mount(:default, nil, session, socket) do
-      {:cont, socket} ->
-        if socket.assigns[:current_user] do
-          {:cont, socket}
-        else
-          {:halt, redirect(socket, to: "/")}
-        end
-    end
+    # Modified to allow access without authentication
+    on_mount(:default, nil, session, socket)
   end
 
   defp load_user(nil), do: nil

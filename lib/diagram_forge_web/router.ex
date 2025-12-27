@@ -9,6 +9,7 @@ defmodule DiagramForgeWeb.Router do
     plug :put_root_layout, html: {DiagramForgeWeb.Layouts, :root}
     plug :protect_from_forgery
     plug :put_secure_browser_headers
+    plug DiagramForgeWeb.Plugs.Locale
     plug DiagramForgeWeb.Plugs.Auth
   end
 
@@ -16,12 +17,7 @@ defmodule DiagramForgeWeb.Router do
     plug :accepts, ["json"]
   end
 
-  pipeline :require_auth do
-    plug DiagramForgeWeb.Plugs.RequireAuth
-  end
-
   pipeline :require_superadmin do
-    plug DiagramForgeWeb.Plugs.RequireAuth
     plug DiagramForgeWeb.Plugs.RequireSuperadmin
   end
 

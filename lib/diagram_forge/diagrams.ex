@@ -403,7 +403,7 @@ defmodule DiagramForge.Diagrams do
 
   defp broadcast_if_created(error), do: error
 
-  defp create_user_diagram_entry(diagram, user_id) do
+  defp create_user_diagram_entry(diagram, user_id) when not is_nil(user_id) do
     user_diagram_changeset =
       UserDiagram.changeset(%UserDiagram{}, %{
         user_id: user_id,
@@ -415,6 +415,13 @@ defmodule DiagramForge.Diagrams do
       {:ok, _user_diagram} -> diagram
       {:error, changeset} -> Repo.rollback(changeset)
     end
+  end
+  
+  defp create_user_diagram_entry(diagram, nil) do
+    # For anonymous users, we still want to create the diagram
+    # but without the user association. The diagram will have a nil user_id
+    # and will be treated as a public diagram
+    diagram
   end
 
   @doc """
